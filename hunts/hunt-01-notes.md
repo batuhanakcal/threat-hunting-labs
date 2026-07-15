@@ -27,5 +27,14 @@
 ## Verdict
 Likely benign internal activity: a Python script (UA "__main__/0.2") on Frothly's AWS server gacrux systematically crawled the internal forum (197 GET requests / 22 min; forum pages, user profiles, login/lostpw/register). Fully internal, port 80 only, no external or DNS footprint. However, auth-surface enumeration is behaviorally indistinguishable from recon when seen in isolation → class of behavior worth a detection.
 
-## Detection idea (to develop)
+## Detection idea
 Alert when a single internal source enumerates >N distinct uri_query values on auth-related pages within a short window, with a non-browser user-agent.
+
+## Detection development (from the hunt finding)
+
+Goal: alert when one internal actor enumerates the auth surface with a non-browser agent.
+
+- **v1** — auth pages, by clientip, span=15m, dc>10 → 0 results. Too strict: activity spread across windows/pages. Lesson: threshold + window define what a rule can see.
+- **v2** — auth pages, by clientip, span=30m, dc>3 → 1 row: 172.16.0.149, 14 distinct queries, __main__/0.2 among agents. TP=1, FP=0, but agents column mixed (proxy effect).
+- **v3** — no path filter, by clientip+useragent, dc>15 → script caught (17) BUT 4 real browsers also exceeded (16–32). Lesson: variety alone ≠ malice on a busy forum; scope matters.
+- **v4 (final)** — auth pages + by clientip, useragent + span=30m, dc>3 → behavioral signal × correct scope × actor separation.
