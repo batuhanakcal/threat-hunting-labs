@@ -89,3 +89,27 @@ index=botsv3 sourcetype=stream:tcp src_ip=172.16.0.149 | stats count by dest_ip,
 ```
 **What:** All TCP destinations + ports for a host.
 **When:** "Is this machine doing anything besides X?" — C2/lateral movement check after spotting odd behavior.
+### List all distinct values of fields for an entity
+```
+index=botsv3 src_ip=172.16.0.149 | stats values(src_mac) values(host) by src_ip
+```
+**What:** values() collects every distinct value — identity gathering, not counting.
+**When:** "Who IS this machine?" — MAC + hostname identification after behavioral findings.
+
+### Field-blind check
+```
+index=botsv3 sourcetype=stream:dns 172.16.0.149
+```
+**What:** Bare string search — matches anywhere in raw events, no field assumptions.
+**When:** Before declaring "no trace in X data", when unsure of field names.
+
+### Verify a data source exists before claiming absence
+```
+index=botsv3 sourcetype=stream:dns | stats count
+```
+**What:** Total event count for a source.
+**When:** "No DNS record for host" only counts as evidence if DNS is actually collected. Absence of evidence ≠ evidence of absence — check visibility first.
+
+## Gotchas (additions)
+- MAC vendor lookup is useless in cloud/VM environments — `02:` prefix = locally-administered (virtual) MAC.
+- Hostnames like `name.i-0abc123...` = AWS EC2 instance IDs → you're looking at cloud infrastructure.
