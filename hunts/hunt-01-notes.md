@@ -10,7 +10,7 @@
 - __main__/0.2 deep-dive: single IP 172.16.0.149 (internal!), 22 min, ~9 req/min, all GET, all 200. Systematically enumerating forum: forumdisplay.php?fid=4..10, showthread.php?tid=*, member.php uid=27/31/40 + login/lostpw/register pages → recon-style crawling of users & auth surface.
 - Entity pivot: IP lives in 5 sourcetypes (10,859 events) incl. stream:tcp/ip/http/arp → it's a machine on Frothly's local network.
 
-## Open question (next session)
+## Open question
 - stream:tcp map for 172.16.0.149: external destinations? odd ports? → decides "employee script" vs "compromised host doing recon".
 
 ## Lessons logged
