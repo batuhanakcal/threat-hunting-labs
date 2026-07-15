@@ -113,3 +113,20 @@ index=botsv3 sourcetype=stream:dns | stats count
 ## Gotchas (additions)
 - MAC vendor lookup is useless in cloud/VM environments — `02:` prefix = locally-administered (virtual) MAC.
 - Hostnames like `name.i-0abc123...` = AWS EC2 instance IDs → you're looking at cloud infrastructure.
+
+## Detection engineering
+
+### Time-windowed behavior counting (detection skeleton)
+```
+index=botsv3 sourcetype=access_combined uri_path IN ("/member.php", "/login*")
+| bin _time span=30m
+| stats dc(uri_query) as distinct_queries by clientip, useragent, _time
+| where distinct_queries > 3
+```
+**What:** `bin _time span=X` buckets events into time windows; `dc()` counts DISTINCT values (variety, not volume); `where` filters the computed stats (post-aggregation threshold); `IN (...)` = tidy multi-value OR.
+**When:** Core skeleton for behavioral detections: "entity does too many different things in a short window."
+
+## Gotchas (additions)
+- "N events" (top bar) = raw events entering the pipeline; "Statistics (N)" = rows surviving aggregation + where. 0 stats with many events = threshold/window question, not missing data.
+- Behind a proxy/ELB, grouping only by clientip merges many actors into one row → add useragent to the `by` clause to separate them.
+- dc(uri_query) alone can't separate scripts from humans on a busy site — legit browsing also produces variety. Pair the behavioral signal with the right scope (e.g., auth pages only).
