@@ -130,3 +130,14 @@ index=botsv3 sourcetype=access_combined uri_path IN ("/member.php", "/login*")
 - "N events" (top bar) = raw events entering the pipeline; "Statistics (N)" = rows surviving aggregation + where. 0 stats with many events = threshold/window question, not missing data.
 - Behind a proxy/ELB, grouping only by clientip merges many actors into one row → add useragent to the `by` clause to separate them.
 - dc(uri_query) alone can't separate scripts from humans on a busy site — legit browsing also produces variety. Pair the behavioral signal with the right scope (e.g., auth pages only).
+
+### Extract a field from another field (rex)
+```
+index=botsv3 sourcetype=bash_history
+| rex field=source "/home/(?<username>[^/]+)/"
+| stats count by username | sort - count
+```
+**What:** rex applies a regex to a field and births a new field from the capture group `(?<name>...)`. `[^/]+` = everything up to the next slash.
+**When:** The info I need is buried inside another field (paths, URLs, raw text) and no parsed field exists. Anchor + capture + stop.
+
+**Gotcha:** Not every sourcetype comes parsed (bash_history had no user field — only default metadata). Check fieldsummary first; if empty, read raw events — the answer may live in metadata like `source`.
