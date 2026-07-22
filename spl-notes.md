@@ -177,9 +177,9 @@ index=botsv3 sourcetype=access_combined
 ```
 index=botsv3 sourcetype=access_combined
 | stats count by clientip
-| eventstats avg(count) as ort, stdev(count) as sapma
-| eval ust_sinir = ort + (2 * sapma)
-| where count > ust_sinir
+| eventstats avg(count) as avg_count, stdev(count) as std_count
+| eval upper_limit = avg_count + (2 * std_count)
+| where count > upper_limit
 ```
 **What:** stdev measures spread. Normal band = avg ± 2*stdev. `eval` = SPL's calculator, builds a new field from other fields.
 **When:** "Show me statistical outliers" without hardcoding a threshold.
