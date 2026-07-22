@@ -199,3 +199,39 @@ The stdev multiplier is a SENSITIVITY DIAL: 1 = tight/noisy (more FP), 3 = loose
 
 ### You don't compute this by hand
 `stdev()`, `median()`, `avg()` do the math for you. You learned the mechanics not to memorize the formula, but to READ the result — to know when a statistic is lying (dirtied by an outlier) instead of trusting the number blindly. That judgment is the hunter skill, not typing the function.
+
+## Robust baselining — choosing the right measure for the data's SHAPE
+
+### MAD (Median Absolute Deviation) — stdev's outlier-immune twin
+```
+index=botsv3 sourcetype=access_combined
+| stats count by clientip
+| eventstats median(count) as median_count
+| eval distance = abs(count - median_count)
+| eventstats median(distance) as mad
+| eval mad_safe = if(mad=0, 1, mad)
+| where count > median_count + (10 * mad_safe)
+```
+**What:** Splunk has no mad() function — build it: (1) distance of each value from median, (2) median of those distances. `abs()` = absolute value. `if(cond, then, else)` = eval's decision function.
+**When:** Skewed data with outliers, where stdev gets inflated by giants (masking). MAD ignores giants because median ignores the tails.
+
+**MAD=0 trap:** if most values are identical (e.g. most IPs hit exactly 1), distances are mostly 0, so median-of-distances = 0, and the band collapses to `median + 0`. Fix with `if(mad=0, 1, mad)` or a fixed floor.
+
+### Percentile — shape-agnostic, best for very skewed data
+```
+index=botsv3 sourcetype=access_combined
+| stats count by clientip
+| eventstats perc95(count) as p95
+| where count > p95
+```
+**What:** perc95 = the value below which 95% of entities fall. `where count > p95` = grab the top 5%. No mean, no stdev — just sort and take the top slice.
+**When:** Skewed / zero-heavy / outlier data (like BOTS IP counts). Nothing can dirty a percentile because it does no arithmetic — it just ranks.
+
+### The real lesson — fit the tool to the data's shape
+| Tool | Best for | On BOTS IP data |
+|------|----------|-----------------|
+| stdev (±2σ) | bell curve | inflated by giant → missed 833 (masking) |
+| MAD | outliers + variety | collapsed to 0 (most values identical) |
+| percentile (p95) | any shape, esp. skewed | caught both 833 & 2818, dropped noise ✓ |
+
+"Which statistic is best?" is the wrong question. "Which tool fits THIS data's shape?" is right — and you only know by trying them and reading the results. That judgment is the advanced part, not typing the function.
