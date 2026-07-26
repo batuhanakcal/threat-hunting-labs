@@ -326,3 +326,24 @@ Uses algorithms/ML (clustering, classification, anomaly detection, time-series) 
 ## Two terms to remember
 - **Z-score** = the formal name for "how many standard deviations from the mean" (what my ±2σ band does).
 - **Data dictionary** = structured doc of each field's name/description/type/values. My spl-notes.md is a primitive version.
+
+### streamstats — the flowing baseline
+```
+index=botsv3 sourcetype=access_combined
+| bin _time span=1h
+| stats count as hits by _time
+| sort _time
+| streamstats window=5 avg(hits) as moving_avg
+| eval spike = hits / moving_avg
+| where spike > 3
+```
+**What:** streamstats keeps rows but calculates using ONLY preceding rows (running total, moving average) — unlike eventstats which sees the whole table. `window=5` = look back at last 5 rows only (moving average). `spike = hits/moving_avg` = how many times above recent normal.
+**When:** Time-series anomalies — sudden spikes a fixed baseline would miss. "Did this suddenly jump vs the last N periods?"
+**Critical:** streamstats is order-sensitive → always `sort _time` first.
+
+### stats family — full compass
+- stats → changes row count (reduce/summarize)
+- eventstats → keeps rows, adds column from ALL rows (fixed baseline)
+- streamstats → keeps rows, adds column from PRECEDING rows (flowing baseline, moving averages)
+
+**Cross-validation win:** streamstats flagged the 09:00 traffic spike (3.3x) independently — the same hour the __main__/0.2 hunt found the forum crawler. Two methods, one time window = higher confidence.
