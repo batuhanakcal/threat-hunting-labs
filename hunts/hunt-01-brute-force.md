@@ -144,7 +144,7 @@ layer, not the *authentication* layer.
 
 ## Verdict
 
-**Hypothesis disproved.** No evidence of brute-force authentication in this environment,
+**Hypothesis disproved for the layers examined.** No evidence of brute-force authentication on the web or VPN authentication surfaces,
 confirmed across three independent checks:
 
 1. **Web login:** zero POST requests to any login endpoint; only 11 login-page views and a single `/login.cgi` GET.
