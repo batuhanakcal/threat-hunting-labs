@@ -153,15 +153,26 @@ confirmed across three independent checks:
 
 ## Visibility gap (the real finding)
 
-The environment contains **no failed-authentication logs whatsoever**. Two possible readings:
+## Scope & limitations
 
-- there genuinely were no failed logins, or
-- **AAA authentication logging is not enabled** on the ASA, and failed attempts would be invisible even if they occurred.
+This hunt covered **two authentication surfaces**: the web application (`access_combined`)
+and the VPN/firewall (`cisco:asa`). The verdict applies to those layers only.
 
-This is the actionable output of the hunt: a **detection blind spot**. A brute-force attack
-against the VPN today would likely leave no trace we could hunt. Recommendation: enable/verify
-AAA authentication logging (`%ASA-6-113004/113005`) so that future brute-force hunts have data
-to work with.
+**Not examined in this hunt** - authentication may also occur in:
+
+| Sourcetype | Why it could matter |
+|---|---|
+| `aws:cloudtrail` | AWS console logins (`ConsoleLogin` events carry success/failure) |
+| `aws:rds:audit` | Database authentication attempts (~35k events) |
+| `stream:http` | Richer HTTP detail than access logs, incl. POST bodies |
+| Windows/endpoint auth logs | RDP / SMB / local logon attempts |
+
+These were left out deliberately to keep the hunt scoped and closeable (per PEAK: define a
+stop condition rather than hunting indefinitely). They are logged as candidates for a
+follow-up hunt: *"Brute-force, part 2 - cloud and database authentication."*
+
+**Honest statement of the finding:** *No brute-force activity was found on the web or VPN
+authentication surfaces. Other authentication layers remain unexamined.*
 
 ## Detection idea (deferred)
 
