@@ -1,4 +1,4 @@
-# Hunt #02  Brute-Force Authentication Attempts
+# Hunt #01  Brute-Force Authentication Attempts
 
 **Type:** Hypothesis-driven (PEAK)
 **Environment:** Splunk BOTS v3 (Frothly), all-time
