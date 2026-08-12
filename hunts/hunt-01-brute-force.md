@@ -279,6 +279,43 @@ window, especially if followed by a `result_code=0` from the same source.*
 - **The simple query is usually enough.** `stats count by _raw` answered the same question as a
   `rex`-based version. Reach for regex only when the simple path fails.
 
+
+## Layers 5 & 6 - Windows and network-level HTTP (closing the last gaps)
+
+The scope section originally listed two unexamined surfaces. Both were subsequently checked.
+
+**Windows authentication** - the environment *does* collect Windows security logs
+(`wineventlog:security`, 46,469 events; plus `winhostmon` and Sysmon):
+
+```
+index=botsv3 sourcetype=wineventlog:security (EventCode=4625 OR EventCode=4624) | stats count by EventCode
+```
+
+| EventCode | Meaning | Count |
+|---|---|---|
+| 4624 | Successful logon | 427 |
+| 4625 | **Failed logon** | **3** |
+
+![Windows logon success vs failure](../hunt-01-bruteforce-images/hunt-01-bruteforce-13.png)
+
+Three failed logons across the entire dataset — ordinary user typos, not brute-force. 
+Note this also means Windows auth visibility is healthy here, unlike the ASA gap noted earlier.
+
+**Network-level HTTP POSTs** - `stream:http` does contain POSTs that `access_combined` didn't show:
+
+```
+index=botsv3 sourcetype=stream:http | stats count by http_method
+```
+GET 9,908 · POST 261 · HEAD 43 · PROPFIND 2
+
+![stream:http method distribution](../hunt-01-bruteforce-images/hunt-01-bruteforce-14.png)
+
+Reviewing where those 261 POSTs go (`stats count by site, uri_path`), they are ordinary web
+activity: forum posting (`newthread.php`), form submissions, third-party sites. No concentration
+of POSTs against a login endpoint.
+
+**Both remaining gaps are now closed. Six authentication surfaces examined; no brute-force anywhere.**
+
 ## Scope & limitations (full hunt)
 
 This hunt covered **four authentication surfaces**: web application (`access_combined`),
