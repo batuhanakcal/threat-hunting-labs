@@ -153,26 +153,14 @@ confirmed across three independent checks:
 
 ## Visibility gap (the real finding)
 
-## Scope & limitations
+The environment contains **no failed-authentication logs whatsoever** on the ASA. Two possible readings:
 
-This hunt covered **two authentication surfaces**: the web application (`access_combined`)
-and the VPN/firewall (`cisco:asa`). The verdict applies to those layers only.
+- there genuinely were no failed logins, or
+- **AAA authentication logging is not enabled** on the ASA, and failed attempts would be invisible even if they occurred.
 
-**Not examined in this hunt** - authentication may also occur in:
-
-| Sourcetype | Why it could matter |
-|---|---|
-| `aws:cloudtrail` | AWS console logins (`ConsoleLogin` events carry success/failure) |
-| `aws:rds:audit` | Database authentication attempts (~35k events) |
-| `stream:http` | Richer HTTP detail than access logs, incl. POST bodies |
-| Windows/endpoint auth logs | RDP / SMB / local logon attempts |
-
-These were left out deliberately to keep the hunt scoped and closeable (per PEAK: define a
-stop condition rather than hunting indefinitely). They are logged as candidates for a
-follow-up hunt: *"Brute-force, part 2 - cloud and database authentication."*
-
-**Honest statement of the finding:** *No brute-force activity was found on the web or VPN
-authentication surfaces. Other authentication layers remain unexamined.*
+This is the actionable output of the hunt: a **detection blind spot**. A brute-force attack against
+the VPN today would likely leave no trace we could hunt. Recommendation: enable/verify AAA
+authentication logging (`%ASA-6-113004/113005`) so that future brute-force hunts have data to work with.
 
 ## Detection idea (deferred)
 
@@ -290,3 +278,24 @@ window, especially if followed by a `result_code=0` from the same source.*
   attackers are irregular; machines are metronomes.
 - **The simple query is usually enough.** `stats count by _raw` answered the same question as a
   `rex`-based version. Reach for regex only when the simple path fails.
+
+## Scope & limitations (full hunt)
+
+This hunt covered **four authentication surfaces**: web application (`access_combined`),
+VPN/firewall (`cisco:asa`), AWS Console (`aws:cloudtrail`), and database (`aws:rds:audit`).
+
+**Still unexamined:**
+
+| Sourcetype | Why it could matter |
+|---|---|
+| `stream:http` | Richer HTTP detail than access logs, incl. POST bodies |
+| Windows/endpoint auth logs | RDP / SMB / local logon attempts |
+
+These are left out deliberately to keep the hunt closeable (per PEAK: define a stop condition
+rather than hunting indefinitely). Logged in the backlog for a future hunt.
+
+The remaining ~100 sourcetypes (network flow, metrics, config, endpoint telemetry) contain no
+authentication events and are out of scope by definition.
+
+**Honest statement of the finding:** *No brute-force activity was found across four authentication
+surfaces. Two potential surfaces remain unexamined.*
