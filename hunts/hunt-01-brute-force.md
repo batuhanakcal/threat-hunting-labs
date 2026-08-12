@@ -205,13 +205,13 @@ layers as unexamined. This section closes that gap, testing the same hypothesis 
 
 **CloudTrail:** 113 distinct API actions across 6,571 events. Authentication = `eventName=ConsoleLogin`.
 
-hunt-01-bruteforce-8
+![CloudTrail eventName inventory](../hunt-01-bruteforce-images/hunt-01-bruteforce-8.png)
 
 A field-parsing problem appeared immediately: `stats count by userName` returned **0 rows despite
 4 matching events**. CloudTrail is nested JSON and the AWS TA isn't installed, so the values exist
 in raw text but aren't queryable as fields. Workaround: read raw events directly.
 
-📸 *[SCREENSHOT 9 — 4 events but 0 stats rows]*
+![4 events but 0 stats rows](../hunt-01-bruteforce-images/hunt-01-bruteforce-9.png)
 
 **RDS audit:** CSV-like format, not JSON:
 ```
@@ -222,14 +222,14 @@ Fields: `timestamp | server | user | source host | connection id | query id | op
 Database authentication = the `CONNECT` operation; success/failure lives in the final
 `result_code` (**0 = success, non-zero = failure**).
 
-📸 *[SCREENSHOT 10 — RDS audit raw format]*
+![RDS audit raw format](../hunt-01-bruteforce-images/hunt-01-bruteforce-10.png)
 
 ## Layer 3 - AWS Console logins
 
 ```
 index=botsv3 sourcetype=aws:cloudtrail eventName=ConsoleLogin | table _time, _raw
 ```
-📸 *[SCREENSHOT 11 — the 4 ConsoleLogin raw events]*
+![ConsoleLogin raw events](../hunt-01-bruteforce-images/hunt-01-bruteforce-11.png)
 
 Only **4 ConsoleLogin events** in the entire dataset. All four: user `bstoll` (the same user seen
 in the VPN sessions above), `"ConsoleLogin": "Success"` — zero failures, Chrome/Edge user agents,
@@ -242,7 +242,7 @@ Normal workday activity. Brute-force would produce dozens of `"Failure"` records
 ```
 index=botsv3 sourcetype=aws:rds:audit CONNECT | stats count by _raw | sort - count | head 20
 ```
-📸 *[SCREENSHOT 12 — raw CONNECT pattern]*
+![RDS CONNECT pattern](../hunt-01-bruteforce-images/hunt-01-bruteforce-12.png)
 
 **2,579 CONNECT events, every one ending in `result_code = 0`.** Zero failed authentications.
 
