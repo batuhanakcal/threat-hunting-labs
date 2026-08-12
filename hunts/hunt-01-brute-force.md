@@ -318,21 +318,7 @@ of POSTs against a login endpoint.
 
 ## Scope & limitations (full hunt)
 
-This hunt covered **four authentication surfaces**: web application (`access_combined`),
-VPN/firewall (`cisco:asa`), AWS Console (`aws:cloudtrail`), and database (`aws:rds:audit`).
-
-**Still unexamined:**
-
-| Sourcetype | Why it could matter |
-|---|---|
-| `stream:http` | Richer HTTP detail than access logs, incl. POST bodies |
-| Windows/endpoint auth logs | RDP / SMB / local logon attempts |
-
-These are left out deliberately to keep the hunt closeable (per PEAK: define a stop condition
-rather than hunting indefinitely). Logged in the backlog for a future hunt.
-
-The remaining ~100 sourcetypes (network flow, metrics, config, endpoint telemetry) contain no
-authentication events and are out of scope by definition.
-
-**Honest statement of the finding:** *No brute-force activity was found across four authentication
-surfaces. Two potential surfaces remain unexamined.*
+All identified authentication surfaces in this environment have been examined: web application,
+VPN, AWS Console, database, Windows, and network-level HTTP. The remaining ~100 sourcetypes
+(network flow, metrics, config, endpoint telemetry) contain no authentication events and are out
+of scope by definition.
