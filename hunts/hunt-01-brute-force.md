@@ -191,3 +191,102 @@ if followed by a success from the same source.*
   data source collects that evidence.
 - **Big numbers aren't findings.** Break them down (here: `rex` on message codes) before reacting.
 - **A disproved hypothesis is a successful hunt** especially when it surfaces a logging gap.
+
+
+---
+
+# Part 2 - Closing the Scope Gap: Cloud & Database Layers
+
+The original hunt covered web and VPN authentication and explicitly listed cloud and database
+layers as unexamined. This section closes that gap, testing the same hypothesis against
+`aws:cloudtrail` and `aws:rds:audit`.
+
+## Recon — authentication in two new sources
+
+**CloudTrail:** 113 distinct API actions across 6,571 events. Authentication = `eventName=ConsoleLogin`.
+
+hunt-01-bruteforce-8.png
+
+A field-parsing problem appeared immediately: `stats count by userName` returned **0 rows despite
+4 matching events**. CloudTrail is nested JSON and the AWS TA isn't installed, so the values exist
+in raw text but aren't queryable as fields. Workaround: read raw events directly.
+
+📸 *[SCREENSHOT 9 — 4 events but 0 stats rows]*
+
+**RDS audit:** CSV-like format, not JSON:
+```
+20180820 14:54:02,ip-10-2-1-63,rdsadmin,localhost,35209,908272,QUERY,mysql,'SELECT ...',0
+```
+Fields: `timestamp | server | user | source host | connection id | query id | operation | database | query | result_code`
+
+Database authentication = the `CONNECT` operation; success/failure lives in the final
+`result_code` (**0 = success, non-zero = failure**).
+
+📸 *[SCREENSHOT 10 — RDS audit raw format]*
+
+## Layer 3 - AWS Console logins
+
+```
+index=botsv3 sourcetype=aws:cloudtrail eventName=ConsoleLogin | table _time, _raw
+```
+📸 *[SCREENSHOT 11 — the 4 ConsoleLogin raw events]*
+
+Only **4 ConsoleLogin events** in the entire dataset. All four: user `bstoll` (the same user seen
+in the VPN sessions above), `"ConsoleLogin": "Success"` — zero failures, Chrome/Edge user agents,
+from `107.77.212.175` (×3, matching his VPN IP) and `157.97.121.132` (×1). Also: `"MFAUsed": "No"`.
+
+Normal workday activity. Brute-force would produce dozens of `"Failure"` records — there are none.
+
+## Layer 4 - Database connections
+
+```
+index=botsv3 sourcetype=aws:rds:audit CONNECT | stats count by _raw | sort - count | head 20
+```
+📸 *[SCREENSHOT 12 — raw CONNECT pattern]*
+
+**2,579 CONNECT events, every one ending in `result_code = 0`.** Zero failed authentications.
+
+The raw pattern explains itself: user `frothlyadmin` connecting from internal IPs `172.16.0.127`
+and `172.16.0.13` at rigid 30-second intervals (09:04:13, 09:04:43, 09:05:13, 09:05:43…).
+Machine-precise regularity = **application connection pool**, not a human or an attacker.
+
+## Final verdict - all four authentication surfaces
+
+| Layer | Sourcetype | Result |
+|---|---|---|
+| Web application | `access_combined` | No POST to any login endpoint → no attempts |
+| VPN / firewall | `cisco:asa` | 4 legitimate multi-hour sessions; no failed-auth logs at all |
+| AWS Console | `aws:cloudtrail` | 4 successful logins, zero failures |
+| Database | `aws:rds:audit` | 2,579 successful connections, zero failures |
+
+**No evidence of brute-force activity anywhere in Frothly's authentication surfaces.** The
+remaining sourcetypes (network flow, metrics, config, endpoint telemetry) contain no
+authentication events and are out of scope by definition. The hypothesis is now fully closed.
+
+## Additional security observations
+
+1. **No MFA on AWS Console** — `"MFAUsed": "No"` on all four IAM console logins. If `bstoll`'s
+   password were compromised, nothing would stop the attacker. *Recommendation: enforce MFA on IAM users.*
+2. **Two source IPs for one user, same day** — not suspicious in isolation, but worth an
+   "impossible travel" detection while MFA stays off.
+3. **Second visibility gap — AWS TA missing.** CloudTrail's nested JSON isn't field-extracted, so
+   field-based queries silently return nothing. Combined with the ASA failed-auth gap above, this
+   environment has **two significant authentication blind spots**.
+
+## Detection idea (database layer)
+
+Unlike the ASA and CloudTrail layers, the database layer *has* the required signal today:
+*alert when a single source produces N `CONNECT` events with non-zero `result_code` in a short
+window, especially if followed by a `result_code=0` from the same source.*
+
+## Additional lessons
+
+- **Every data source encodes "login" differently.** Web = POST to a login endpoint; VPN = ASA
+  message codes; CloudTrail = `eventName=ConsoleLogin` + `responseElements`; database = `CONNECT`
+  + `result_code`. Same hypothesis, four translations. Learning each source's own language *is* the job.
+- **Events > 0 but stats = 0 means a field problem, not a data problem.** Nested JSON without the
+  right TA looks like "no results" - fall back to `table _time, _raw` and read it yourself.
+- **Recognize automation by rhythm.** Rigid 30-second intervals are a connection pool. Humans and
+  attackers are irregular; machines are metronomes.
+- **The simple query is usually enough.** `stats count by _raw` answered the same question as a
+  `rex`-based version. Reach for regex only when the simple path fails.
