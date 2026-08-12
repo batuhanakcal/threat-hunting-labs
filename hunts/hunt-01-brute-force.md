@@ -205,7 +205,7 @@ layers as unexamined. This section closes that gap, testing the same hypothesis 
 
 **CloudTrail:** 113 distinct API actions across 6,571 events. Authentication = `eventName=ConsoleLogin`.
 
-hunt-01-bruteforce-8.png
+hunt-01-bruteforce-8
 
 A field-parsing problem appeared immediately: `stats count by userName` returned **0 rows despite
 4 matching events**. CloudTrail is nested JSON and the AWS TA isn't installed, so the values exist
