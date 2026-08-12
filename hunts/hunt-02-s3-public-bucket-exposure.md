@@ -20,7 +20,7 @@ An archive being pushed to cloud storage is exactly what data exfiltration looks
 (MITRE **T1567.002 — Exfiltration to Cloud Storage**). It is also exactly what a normal
 deployment looks like. That ambiguity is the hunt.
 
-📸 *[SCREENSHOT 1 — mars bash_history, the s3-upload commands]*
+![mars bash history s3-upload commands](../hunt-02-s3-images/hunt-02-S3-1.png)
 
 Notable detail: the command was run three times with varying `--file` values and a
 `sudo pip install boto3` in between — a human operator, typos and all, not automation.
@@ -55,7 +55,7 @@ The filename is the entity here, not an IP. Field-blind search across the whole 
 ```
 index=botsv3 "*memcac*" | stats count by sourcetype
 ```
-📸 *[SCREENSHOT 2 — filename pivot across 19 sourcetypes]*
+![filename pivot across sourcetypes](../hunt-02-s3-images/hunt-02-S3-2.png)
 
 19 sourcetypes, 1,471 events. Most of it is noise from the **memcached service** itself
 (`ps` 832, `top` 416, `lsof`, `Unix:ListeningPorts`) — Frothly runs memcached, so the string
@@ -75,7 +75,7 @@ index=botsv3 sourcetype=aws:s3:accesslogs "*memcac*"
 | rex field=_raw "(?<operation>REST\.\w+\.\w+)"
 | stats count by operation | sort - count
 ```
-📸 *[SCREENSHOT 3 — S3 operation breakdown]*
+![S3 operation breakdown](../hunt-02-s3-images/hunt-02-S3-3.png)
 
 | Operation | Count |
 |---|---|
@@ -101,7 +101,7 @@ index=botsv3 sourcetype=aws:s3:accesslogs "*memcac*" REST.GET.OBJECT
 | rex field=_raw "\] (?<src_ip>\d+\.\d+\.\d+\.\d+) (?<requester>\S+)"
 | stats count by src_ip, requester | sort - count
 ```
-📸 *[SCREENSHOT 4 — authenticated vs anonymous downloads]*
+![authenticated vs anonymous downloads](../hunt-02-s3-images/hunt-02-S3-4.png)
 
 | Source IP | Requester | Count |
 |---|---|---|
@@ -126,7 +126,7 @@ using `aws-cli` from outside Frothly's infrastructure.
 index=botsv3 sourcetype=aws:cloudtrail (PutBucketAcl OR PutBucketPolicy OR PutObjectAcl)
 | table _time, _raw
 ```
-📸 *[SCREENSHOT 5 — the two PutBucketAcl events]*
+![PutBucketAcl events](../hunt-02-s3-images/hunt-02-S3-5.png)
 
 Exactly two events, same user, same source IP — one opening the bucket, one closing it.
 
@@ -154,7 +154,7 @@ index=botsv3 sourcetype=aws:s3:accesslogs frothlywebcode
 | rex field=_raw "REST\.\w+\.\w+ (?<object>\S+)"
 | stats count by object | sort - count
 ```
-📸 *[SCREENSHOT 6 — bucket object inventory]*
+![bucket object inventory](../hunt-02-s3-images/hunt-02-S3-6.png)
 
 | Object | Count |
 |---|---|
