@@ -1,4 +1,4 @@
-# The stats Family Explained — stats vs eventstats vs streamstats
+# The stats Family Explained: stats vs eventstats vs streamstats
 
 Splunk's three aggregation commands look similar but differ in one thing:
 **what they look at, and whether they change the row count.**
@@ -17,7 +17,7 @@ One-line rule: **need fewer rows → stats. Need a column added → eventstats (
 
 ---
 
-## 1. stats — summarize and forget
+## 1. stats - summarize and forget
 
 Groups events and replaces them with a summary. 3,907 events in → a handful of rows out. Powerful but destructive: the original events are gone.
 
@@ -28,11 +28,11 @@ index=botsv3 sourcetype=access_combined | stats count by clientip
 
 ---
 
-## 2. eventstats — the oracle (sees the whole table)
+## 2. eventstats - the oracle (sees the whole table)
 
 Calculates across the **entire** result set, then attaches the same result onto **every** row. Rows are preserved. Because it sees all rows at once, it is **not** order-sensitive.
 
-Think of a teacher who reads every exam first, then writes "class average: 95" on all papers — same number on each.
+Think of a teacher who reads every exam first, then writes "class average: 95" on all papers, the same number on each.
 
 Example with values 100, 50, 200, 30:
 ```
@@ -42,7 +42,7 @@ Example with values 100, 50, 200, 30:
 30   → avg: 95
 ```
 
-**Use for a FIXED baseline** — compare each entity to the global norm:
+**Use for a FIXED baseline** compare each entity to the global norm:
 ```
 index=botsv3 sourcetype=access_combined
 | stats count by clientip
@@ -53,11 +53,11 @@ index=botsv3 sourcetype=access_combined
 
 ---
 
-## 3. streamstats — real-time (sees only the past)
+## 3. streamstats - real-time (sees only the past)
 
 Walks the rows **in order** and calculates using **only the rows seen so far**. Each row gets a different result. Because it depends on what came before, it **is** order-sensitive → always `sort _time` first.
 
-Think of a teacher who grades papers as they arrive and writes the running average on each — first paper knows only itself, last paper knows them all.
+Think of a teacher who grades papers as they arrive and writes the running average on each; the first paper knows only itself, the last paper knows them all.
 
 Same values 100, 50, 200, 30:
 ```
@@ -69,7 +69,7 @@ Same values 100, 50, 200, 30:
 
 ### Two modes
 
-**Windowless** — accumulates from the very start (running total/count):
+**Windowless** accumulates from the very start (running total/count):
 ```
 | sort _time | streamstats count as running_count
 ```
@@ -86,15 +86,15 @@ index=botsv3 sourcetype=access_combined
 ```
 "Is this hour a spike vs the last 5 hours?" A fixed baseline can miss this; a flowing one catches it.
 
-**Note:** the time granularity ("hourly") comes from `bin span=1h`, NOT from streamstats. streamstats just flows over whatever rows it's given — change the span to change the granularity.
+**Note:** the time granularity ("hourly") comes from `bin span=1h`, NOT from streamstats. Streamstats just flows over whatever rows it's given; change the span to change the granularity.
 
 ---
 
-## Fixed vs flowing baseline — the key mental model
+## Fixed vs flowing baseline: the key mental model
 
 - **eventstats** = fixed baseline. "Above the *overall* norm?" Good for static comparison.
 - **streamstats** = flowing baseline. "A sudden jump vs *recent* behavior?" Good for time-series anomalies.
 
 Attacks are often sudden jumps, so streamstats catches things a fixed baseline smooths over. Best hunters use both and cross-check: if two independent methods flag the same entity/time window, confidence goes up.
 
-*(In BOTS v3, streamstats independently flagged the 09:00 traffic spike (3.3×) — the same hour the hypothesis-driven hunt found the __main__/0.2 forum crawler. Two methods, one time window = stronger finding.)*
+*(In BOTS v3, streamstats independently flagged the 09:00 traffic spike (3.3×) the same hour the hypothesis-driven hunt found the __main__/0.2 forum crawler. Two methods, one time window = stronger finding.)*
