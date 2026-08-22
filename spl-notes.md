@@ -1,6 +1,6 @@
 # SPL Notes
 
-Personal SPL reference — every query I learn goes here.
+Personal SPL reference: every query I learn goes here.
 Format: the query, what it does, and when it should come to mind.
 
 ---
@@ -23,7 +23,7 @@ index=botsv3 | stats count by host | sort - count
 ```
 
 **What:** Lists all machines sending logs, in loudest-first order.
-**When:** Mapping out an environment — how many systems, which ones matter.
+**When:** Mapping out an environment: how many systems, which ones matter.
 
 ### Verify data exists (ignores time range)
 
@@ -31,7 +31,7 @@ index=botsv3 | stats count by host | sort - count
 | eventcount summarize=false index=botsv3
 ```
 
-**What:** Asks the index metadata for the total event count — not affected by the time picker.
+**What:** Asks the index metadata for the total event count not affected by the time picker.
 **When:** Search returns 0, and I need to know whether the data is missing or my search is wrong.
 
 ---
@@ -46,13 +46,13 @@ index=botsv3 | stats count by host | sort - count
 index=botsv3 sourcetype=access_combined | stats count by clientip | sort - count
 ```
 **What:** Who sends the most requests to the web server.
-**When:** Starting point of any web log hunt — but beware: behind an ELB/proxy, clientip may hide the real source.
+**When:** Starting point of any web log hunt, but beware: behind an ELB/proxy, clientip may hide the real source.
 
 ### Most requested URIs
 ```
 index=botsv3 sourcetype=access_combined | stats count by uri | sort - count
 ```
-**What:** The server's "greatest hits" — what normal demand looks like.
+**What:** The server's "greatest hits" of normal demand.
 **When:** Building a baseline of normal before hunting deviations.
 
 ### Error-focused recon hunt
@@ -66,14 +66,14 @@ index=botsv3 sourcetype=access_combined status>=400 | stats count by uri, status
 ```
 index=botsv3 sourcetype=access_combined | stats count by useragent | sort - count
 ```
-**What:** Self-identification of requesting software; attack tools often stand out (Hakai, python scripts, blank UAs).
+**What:** Self-identification of requesting software; attack tools often stand out (Hakai, Python scripts, blank UAs).
 **When:** Fast way to spot non-browser activity in web logs.
 
 ### Suspicious UA deep-dive
 ```
 index=botsv3 sourcetype=access_combined useragent="__main__/0.2" | stats count by method, uri_path, uri_query | sort - count
 ```
-**What:** What a suspicious agent actually did — method, pages, parameters.
+**What:** What a suspicious agent actually did: method, pages, parameters.
 **When:** After flagging a UA; separates crawling vs exploitation vs web shell chatter.
 
 ### Entity pivot across sourcetypes
@@ -81,26 +81,26 @@ index=botsv3 sourcetype=access_combined useragent="__main__/0.2" | stats count b
 index=botsv3 clientip=1.2.3.4 OR src_ip=1.2.3.4 OR src=1.2.3.4 | stats count by sourcetype
 ```
 **What:** Every data layer where an entity appears (field names differ per sourcetype, hence the ORs).
-**When:** Core hunting move — one behavior in one layer means little; combine layers around the entity.
+**When:** Core hunting move: one behavior in one layer means little; combine layers around the entity.
 
 ### Who does this host talk to (TCP map)
 ```
 index=botsv3 sourcetype=stream:tcp src_ip=172.16.0.149 | stats count by dest_ip, dest_port | sort - count
 ```
 **What:** All TCP destinations + ports for a host.
-**When:** "Is this machine doing anything besides X?" — C2/lateral movement check after spotting odd behavior.
+**When:** "Is this machine doing anything besides X?" C2/lateral movement check after spotting odd behavior.
 ### List all distinct values of fields for an entity
 ```
 index=botsv3 src_ip=172.16.0.149 | stats values(src_mac) values(host) by src_ip
 ```
-**What:** values() collects every distinct value — identity gathering, not counting.
-**When:** "Who IS this machine?" — MAC + hostname identification after behavioral findings.
+**What:** values() collects every distinct value identity gathering, not counting.
+**When:** "Who IS this machine?" MAC + hostname identification after behavioral findings.
 
 ### Field-blind check
 ```
 index=botsv3 sourcetype=stream:dns 172.16.0.149
 ```
-**What:** Bare string search — matches anywhere in raw events, no field assumptions.
+**What:** Bare string search matches anywhere in raw events, no field assumptions.
 **When:** Before declaring "no trace in X data", when unsure of field names.
 
 ### Verify a data source exists before claiming absence
@@ -108,10 +108,10 @@ index=botsv3 sourcetype=stream:dns 172.16.0.149
 index=botsv3 sourcetype=stream:dns | stats count
 ```
 **What:** Total event count for a source.
-**When:** "No DNS record for host" only counts as evidence if DNS is actually collected. Absence of evidence ≠ evidence of absence — check visibility first.
+**When:** "No DNS record for host" only counts as evidence if DNS is actually collected. Absence of evidence ≠ evidence of absence; check visibility first.
 
 ## Gotchas (additions)
-- MAC vendor lookup is useless in cloud/VM environments — `02:` prefix = locally-administered (virtual) MAC.
+- MAC vendor lookup is useless in cloud/VM environments; `02:` prefix = locally-administered (virtual) MAC.
 - Hostnames like `name.i-0abc123...` = AWS EC2 instance IDs → you're looking at cloud infrastructure.
 
 ## Detection engineering
@@ -129,7 +129,7 @@ index=botsv3 sourcetype=access_combined uri_path IN ("/member.php", "/login*")
 ## Gotchas (additions)
 - "N events" (top bar) = raw events entering the pipeline; "Statistics (N)" = rows surviving aggregation + where. 0 stats with many events = threshold/window question, not missing data.
 - Behind a proxy/ELB, grouping only by clientip merges many actors into one row → add useragent to the `by` clause to separate them.
-- dc(uri_query) alone can't separate scripts from humans on a busy site — legit browsing also produces variety. Pair the behavioral signal with the right scope (e.g., auth pages only).
+- dc(uri_query) alone can't separate scripts from humans; on a busy site, legit browsing also produces variety. Pair the behavioral signal with the right scope (e.g., auth pages only).
 
 ## Field extraction
 
@@ -142,7 +142,7 @@ index=botsv3 sourcetype=bash_history
 **What:** rex applies a regex to a field and births a new field from the capture group `(?<name>...)`. `[^/]+` = everything up to the next slash. Pattern: anchor + capture + stop.
 **When:** The info I need is buried inside another field (paths, URLs, raw text) and no parsed field exists.
 
-**Gotcha:** Not every sourcetype comes parsed — bash_history had no user field, only default metadata. Check `fieldsummary` first; if empty, read raw events — the answer may live in metadata like `source` (e.g. /home/USER/.bash_history).
+**Gotcha:** Not every sourcetype comes parsed bash_history had no user field, only default metadata. Check `fieldsummary` first; if empty, read raw events. The answer may reside in metadata such as `source` (e.g.,/home/USER/.bash_history).
 
 ---
 
@@ -161,15 +161,15 @@ index=botsv3 sourcetype=access_combined
 | eventstats median(count) as baseline
 | where count > baseline * 10
 ```
-**What:** stats reduces to one row per IP, then eventstats attaches the baseline back onto every row so each IP can be compared to it. `where count > baseline` lets the DATA set the threshold — not a hardcoded number.
-**When:** Baselining — "who deviates from normal" without inventing an eyeball threshold.
+**What:** stats reduces to one row per IP, then eventstats attaches the baseline back onto every row so each IP can be compared to it. `where count > baseline` lets the DATA set the threshold, not a hardcoded number.
+**When:** Baselining "who deviates from normal" without inventing an eyeball threshold.
 
 ---
 
 ## Baseline math
 
 ### Three questions behind "find the anomaly"
-1. **Where is the center?** → median (NOT mean — mean gets dirty)
+1. **Where is the center?** → median (NOT mean; mean gets dirty)
 2. **How spread out?** → stdev (sets the width of the "normal band")
 3. **Where is the line?** → avg ± 2*stdev; outside = anomaly
 
@@ -190,19 +190,19 @@ index=botsv3 sourcetype=access_combined
 - avg ± 3 stdev → ~99.7% of data
 The stdev multiplier is a SENSITIVITY DIAL: 1 = tight/noisy (more FP), 3 = loose/blind (misses), 2 = sane start. Same tradeoff as WAF tuning. Final value comes from TESTING against your own data, not from theory.
 
-### Lessons — no single statistic is holy
+### Lessons: no single statistic is holy
 - **Mean lies, median doesn't:** access_combined mean=177 but median=1 (most IPs hit once; two internal hosts skew the mean). Anomalies inflate the mean, so a big attacker can hide near an inflated average.
-- **stdev gets masked too:** the big anomaly (2818) inflated stdev to 615, pushing the band to 1408 — so the SECOND heavy IP (833) slipped under "normal." Big anomalies hide smaller ones (**masking**).
+- **stdev gets masked too:** the big anomaly (2818) inflated stdev to 615, pushing the band to 1408 so the SECOND heavy IP (833) slipped under "normal." Big anomalies hide smaller ones (**masking**).
 - **The band math, worked by hand:** for values incl. one giant (480), each normal point sat ~50 from the inflated mean, but the giant sat 409 away; squared, it dominated the whole sum → stdev ≈144 driven almost entirely by one point. Without the giant, stdev would've been ~2.
 - **Mature fixes for masking:** median+MAD (doesn't get dirty), OR exclude known giants before baselining, OR use percentiles (works regardless of distribution shape). Hunter reflex: peel off the loudest anomaly, baseline the clean rest, then look at the second layer.
-- **Distribution shape matters:** stdev bands assume a bell curve. The IP data wasn't a bell (many 1s, few giants) — so the band was crude. For skewed data, percentile ("top 1%") is more honest than stdev.
+- **Distribution shape matters:** stdev bands assume a bell curve. The IP data wasn't a bell (many 1s, few giants) so the band was crude. For skewed data, percentile ("top 1%") is more honest than stdev.
 
 ### You don't compute this by hand
-`stdev()`, `median()`, `avg()` do the math for you. You learned the mechanics not to memorize the formula, but to READ the result — to know when a statistic is lying (dirtied by an outlier) instead of trusting the number blindly. That judgment is the hunter skill, not typing the function.
+`stdev()`, `median()`, `avg()` do the math for you. You learned the mechanics not to memorize the formula, but to READ the result to know when a statistic is lying (dirtied by an outlier) instead of trusting the number blindly. That judgment is the hunter skill, not typing the function.
 
-## Robust baselining — choosing the right measure for the data's SHAPE
+## Robust baselining: choosing the right measure for the data's SHAPE
 
-### MAD (Median Absolute Deviation) — stdev's outlier-immune twin
+### MAD (Median Absolute Deviation) stdev's outlier-immune twin
 ```
 index=botsv3 sourcetype=access_combined
 | stats count by clientip
@@ -212,31 +212,31 @@ index=botsv3 sourcetype=access_combined
 | eval mad_safe = if(mad=0, 1, mad)
 | where count > median_count + (10 * mad_safe)
 ```
-**What:** Splunk has no mad() function — build it: (1) distance of each value from median, (2) median of those distances. `abs()` = absolute value. `if(cond, then, else)` = eval's decision function.
+**What:** Splunk has no mad() function; build it: (1) distance of each value from median, (2) median of those distances. `abs()` = absolute value. `if(cond, then, else)` = eval's decision function.
 **When:** Skewed data with outliers, where stdev gets inflated by giants (masking). MAD ignores giants because median ignores the tails.
 
 **MAD=0 trap:** if most values are identical (e.g. most IPs hit exactly 1), distances are mostly 0, so median-of-distances = 0, and the band collapses to `median + 0`. Fix with `if(mad=0, 1, mad)` or a fixed floor.
 
-### Percentile — shape-agnostic, best for very skewed data
+### Percentile shape-agnostic, best for very skewed data
 ```
 index=botsv3 sourcetype=access_combined
 | stats count by clientip
 | eventstats perc95(count) as p95
 | where count > p95
 ```
-**What:** perc95 = the value below which 95% of entities fall. `where count > p95` = grab the top 5%. No mean, no stdev — just sort and take the top slice.
-**When:** Skewed / zero-heavy / outlier data (like BOTS IP counts). Nothing can dirty a percentile because it does no arithmetic — it just ranks.
+**What:** perc95 = the value below which 95% of entities fall. `where count > p95` = grab the top 5%. No mean, no stdev, just sort and take the top slice.
+**When:** Skewed / zero-heavy / outlier data (like BOTS IP counts). Nothing can dirty a percentile because it does no arithmetic; it just ranks.
 
-### The real lesson — fit the tool to the data's shape
+### The real lesson: fit the tool to the data's shape
 | Tool | Best for | On BOTS IP data |
 |------|----------|-----------------|
 | stdev (±2σ) | bell curve | inflated by giant → missed 833 (masking) |
 | MAD | outliers + variety | collapsed to 0 (most values identical) |
 | percentile (p95) | any shape, esp. skewed | caught both 833 & 2818, dropped noise ✓ |
 
-"Which statistic is best?" is the wrong question. "Which tool fits THIS data's shape?" is right — and you only know by trying them and reading the results. That judgment is the advanced part, not typing the function.
+"Which statistic is best?" is the wrong question. "Which tool fits THIS data's shape?" is right, and you only know by trying them and reading the results. That judgment is the advanced part, not typing the function.
 
-### streamstats — the flowing baseline
+### streamstats the flowing baseline
 ```
 index=botsv3 sourcetype=access_combined
 | bin _time span=1h
@@ -246,8 +246,8 @@ index=botsv3 sourcetype=access_combined
 | eval spike = hits / moving_avg
 | where spike > 3
 ```
-**What:** streamstats keeps rows but calculates using ONLY preceding rows (running total, moving average) — unlike eventstats which sees the whole table. `window=5` = look back at last 5 rows only (moving average). `spike = hits/moving_avg` = how many times above recent normal.
-**When:** Time-series anomalies — sudden spikes a fixed baseline would miss. "Did this suddenly jump vs the last N periods?"
+**What:** streamstats keeps rows but calculates using ONLY preceding rows (running total, moving average), unlike eventstats, which sees the whole table. `window=5` = look back at last 5 rows only (moving average). `spike = hits/moving_avg` = how many times above recent normal.
+**When:** Time-series anomalies sudden spikes a fixed baseline would miss. "Did this suddenly jump vs the last N periods?"
 **Critical:** streamstats is order-sensitive → always `sort _time` first.
 
 ### stats family — full compass
@@ -255,4 +255,4 @@ index=botsv3 sourcetype=access_combined
 - eventstats → keeps rows, adds column from ALL rows (fixed baseline)
 - streamstats → keeps rows, adds column from PRECEDING rows (flowing baseline, moving averages)
 
-**Cross-validation win:** streamstats flagged the 09:00 traffic spike (3.3x) independently — the same hour the __main__/0.2 hunt found the forum crawler. Two methods, one time window = higher confidence.
+**Cross-validation win:** streamstats flagged the 09:00 traffic spike (3.3x) independently the same hour the __main__/0.2 hunt found the forum crawler. Two methods, one time window = higher confidence.
