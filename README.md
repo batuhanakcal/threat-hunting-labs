@@ -87,6 +87,6 @@ Hunts produce detections, not just reports. Rules built and threshold-tested aga
 
 ## Reference notes
 
-- **[spl-notes.md](spl-notes.md)** — personal SPL reference: each query with what it does and *when it should come to mind*
-- **[stats-family-explained.md](stats-family-explained.md)** — `stats` vs `eventstats` vs `streamstats`: fixed vs flowing baselines
-- **[peak-framework-notes.md](peak-framework-notes.md)** — PEAK's three hunt types, the ABLE scoping model, and how to fill it in
+- **[spl-notes.md](spl-notes.md)** - personal SPL reference: each query with what it does and *when it should come to mind*
+- **[stats-family-explained.md](stats-family-explained.md)** - `stats` vs `eventstats` vs `streamstats`: fixed vs flowing baselines
+- **[peak-framework-notes.md](peak-framework-notes.md)** - PEAK's three hunt types, the ABLE scoping model, and how to fill it in
