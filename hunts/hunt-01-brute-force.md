@@ -189,7 +189,7 @@ The original hunt covered web and VPN authentication and explicitly listed cloud
 layers as unexamined. This section closes that gap, testing the same hypothesis against
 `aws:cloudtrail` and `aws:rds:audit`.
 
-## Recon — authentication in two new sources
+## Recon - authentication in two new sources
 
 **CloudTrail:** 113 distinct API actions across 6,571 events. Authentication = `eventName=ConsoleLogin`.
 
@@ -220,10 +220,10 @@ index=botsv3 sourcetype=aws:cloudtrail eventName=ConsoleLogin | table _time, _ra
 ![ConsoleLogin raw events](../hunt-01-bruteforce-images/hunt-01-bruteforce-11.png)
 
 Only **4 ConsoleLogin events** in the entire dataset. All four: user `bstoll` (the same user seen
-in the VPN sessions above), `"ConsoleLogin": "Success"` — zero failures, Chrome/Edge user agents,
+in the VPN sessions above), `"ConsoleLogin": "Success"` zero failures, Chrome/Edge user agents,
 from `107.77.212.175` (×3, matching his VPN IP) and `157.97.121.132` (×1). Also: `"MFAUsed": "No"`.
 
-Normal workday activity. Brute-force would produce dozens of `"Failure"` records — there are none.
+Normal workday activity. Brute-force would produce dozens of `"Failure"` records; there are none.
 
 ## Layer 4 - Database connections
 
@@ -255,9 +255,9 @@ authentication events and are out of scope by definition. The hypothesis is now 
 
 1. **No MFA on AWS Console** — `"MFAUsed": "No"` on all four IAM console logins. If `bstoll`'s
    password were compromised, nothing would stop the attacker. *Recommendation: enforce MFA on IAM users.*
-2. **Two source IPs for one user, same day** — not suspicious in isolation, but worth an
+2. **Two source IPs for one user, same day** not suspicious in isolation, but worth an
    "impossible travel" detection while MFA stays off.
-3. **Second visibility gap — AWS TA missing.** CloudTrail's nested JSON isn't field-extracted, so
+3. **Second visibility gap AWS TA missing.** CloudTrail's nested JSON isn't field-extracted, so
    field-based queries silently return nothing. Combined with the ASA failed-auth gap above, this
    environment has **two significant authentication blind spots**.
 
@@ -284,7 +284,7 @@ window, especially if followed by a `result_code=0` from the same source.*
 
 The scope section originally listed two unexamined surfaces. Both were subsequently checked.
 
-**Windows authentication** - the environment *does* collect Windows security logs
+**Windows authentication** the environment *does* collect Windows security logs
 (`wineventlog:security`, 46,469 events; plus `winhostmon` and Sysmon):
 
 ```
@@ -298,7 +298,7 @@ index=botsv3 sourcetype=wineventlog:security (EventCode=4625 OR EventCode=4624) 
 
 ![Windows logon success vs failure](../hunt-01-bruteforce-images/hunt-01-bruteforce-13.png)
 
-Three failed logons across the entire dataset — ordinary user typos, not brute-force. 
+Three failed logons across the entire dataset: ordinary user typos, not brute-force. 
 Note this also means Windows auth visibility is healthy here, unlike the ASA gap noted earlier.
 
 **Network-level HTTP POSTs** - `stream:http` does contain POSTs that `access_combined` didn't show:
