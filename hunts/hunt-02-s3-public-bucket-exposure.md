@@ -198,7 +198,7 @@ permissions on the `frothlywebcode` bucket, from an **MFA-unauthenticated sessio
 external party wrote a file into it (`OPEN_BUCKET_PLEASE_FIX.txt`) demonstrating the write
 permission was exploitable. The user detected the issue himself and revoked the grant.
 
-**Assessment: misconfiguration, not malicious insider activity.** The pattern — open, brief
+**Assessment: misconfiguration, not malicious insider activity.** The pattern open, brief
 window, self-detection via ACL checks, self-remediation is consistent with an administrative
 mistake rather than deliberate exfiltration. But the exposure was real and was found by someone
 outside the organization.
