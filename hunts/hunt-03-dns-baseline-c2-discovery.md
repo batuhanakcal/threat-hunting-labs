@@ -183,7 +183,7 @@ index=botsv3 host=PCERF-L sourcetype=stream:http (igg.biz OR 31.22.4.67)
 
 Three independent indicators:
 
-1. **Path probing in 10 seconds** — `/cgi-bin/`, `/.well-known/`, `/oauth/`, `/favicon.ico`.
+1. **Path probing in 10 seconds** `/cgi-bin/`, `/.well-known/`, `/oauth/`, `/favicon.ico`.
    No human browses like this. This is a C2 framework fingerprinting its own endpoint.
 2. **Fake OAuth channel** `RequestVerificationToken=` followed by a long opaque string. The
    domain impersonates Exchange; the URI impersonates OAuth. **The disguise is consistent across
