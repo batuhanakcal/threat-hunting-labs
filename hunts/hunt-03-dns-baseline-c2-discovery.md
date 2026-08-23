@@ -73,9 +73,9 @@ The top of the list is pure infrastructure: forwarders phoning home, AD/LDAP, WP
 AWS internal. **This is what healthy corporate DNS looks like.** Now anything that doesn't fit
 this shape becomes visible.
 
-## Phase 3: Hunt the anomaly (three techniques)
+## Phase 3: Hunt the anomaly
 
-No single statistic is trusted; three angles were applied to the same data.
+Three angles were applied to the same data. Two came back clean; the third produced the finding.
 
 **a) Domain length** DNS tunneling encodes data into subdomains, inflating name length.
 Median 25 chars, max 75. The longest entries were `ip6.arpa` reverse lookups and mDNS printer
@@ -92,26 +92,60 @@ one registered domain.
 
 Nothing anomalous. **No tunneling.**
 
-**c) Entropy analysis** This is what produced the finding. Entropy measures randomness in a
-string: `google` scores low (a real word), `x7k2mq9pz` scores high. DGA malware generates random
-names, so entropy surfaces them without needing a blocklist.
+**c) Rare, isolated long subdomains** This is what produced the finding. Sorting by rarity alone
+wasn't enough: the tail is dominated by hundreds of single-occurrence reverse-DNS and CDN names,
+and the candidate sat several hundred rows down. Three weak signals had to be combined, none of
+which is suspicious on its own:
 
-Sorting the domain list by rarity and inspecting high-entropy labels, one result stood out:
+- **A long subdomain label** (≥20 characters). Random or machine-generated names are long;
+  legitimate hostnames tend to be short and readable.
+- **An isolated registered domain** (≤3 distinct subdomains observed). Real CDNs, analytics
+  platforms and cloud services produce dozens or hundreds of subdomains. A long random label
+  under a domain that appears almost nowhere else is a different shape entirely.
+- **Low query volume** (<10). Noise repeats; intrusions are quiet.
+
+```
+index=botsv3 sourcetype=stream:dns
+| stats count by query{}
+| rename query{} as domain
+| where NOT match(domain,"(arpa|local)$")
+| rex field=domain "^(?<label>[^.]+)\."
+| rex field=domain "(?<regdom>[^.]+\.[^.]+)$"
+| eventstats dc(domain) as sub_count by regdom
+| where len(label)>=20 AND sub_count<=3 AND count<10
+| sort count
+| table domain, count, sub_count
+```
+
+The two `rex` commands split each domain into its first label and its registered domain
+(`microsoftexchangeservervwu2g8sj20` and `igg.biz`). `eventstats dc(domain) by regdom` then
+attaches, to every row, how many distinct subdomains that registered domain has across the whole
+dataset — which is what separates an established service from a one-off.
+
+Thresholds were tuned against the data, the same way detection thresholds were tuned in Hunt #01:
+label length ≥20 keeps the list readable without dropping candidates, ≤3 subdomains excludes
+established services, and <10 queries keeps it in the rare tail. Looser values flood the output
+with CDN infrastructure; tighter ones risk dropping genuine anomalies.
+
+**5,063 domains reduced to 15 rows:**
+
+![rare isolated long subdomains](../hunt-03-dns-images/hunt-03-dns-3.png)
+
+Most of the 15 are explainable: Shopify storefronts, Firebase instances, WPEngine CDN nodes,
+moatpixel ad infrastructure. One is not:
 
 ```
 microsoftexchangeservervwu2g8sj20.igg.biz     3 queries
 ```
 
-![rarest domains - LFO analysis](../hunt-03-dns-images/hunt-03-dns-3.png)
-
 Suspicious on two independent grounds:
-1. **Impersonation** "microsoftexchangeserver" followed by a random suffix. Deliberately built
-   to look like Microsoft infrastructure in a log review.
+1. **Impersonation** "microsoftexchangeserver" followed by a random-looking suffix. Deliberately
+   built to look like Microsoft infrastructure to anyone skimming a log.
 2. **Infrastructure** `igg.biz` is not a Microsoft domain. It's a free dynamic-DNS provider,
    commonly used for disposable C2 because it costs nothing and requires no identity.
 
-And only **3 queries** are the *least-frequently-occurring* principle. Noise repeats; attacks
-are rare.
+And only **3 queries** out of 176,831. No blocklist was involved; the domain surfaced purely
+because its *shape* and *rarity* didn't fit the environment.
 
 ## Phase 4: Validate the anomaly
 
@@ -366,12 +400,18 @@ requires tuning against the local environment (see Hunt #01's v1→v4 methodolog
 - **Baseline hunting finds what you weren't looking for.** No IOC list, no intel feed, no alert
   just a statistical profile of normal and a search for what didn't fit. 218,456 events reduced to
   one 3-query anomaly, which unraveled into a full compromise.
-- **Rarity is a signal.** The malicious domain appeared 3 times among 176,831 queries. Noise
-  repeats; intrusions are quiet. Sorting *ascending* by count is as valuable as sorting in descending order.
-- **Entropy beats blocklists.** This domain was on no threat feed I used. It was found because its
-  *shape* was wrong: a brand name welded to a random string on free infrastructure.
-- **Use several statistics, expect most to find nothing.** Length and cardinality analysis both
-  came back clean; entropy found it. Running all three is what makes "nothing here" trustworthy.
+- **Rarity alone isn't enough.** Sorting least-frequent-first put the malicious domain several
+  hundred rows down, buried under single-occurrence reverse-DNS and CDN names. The tail has to be
+  cleaned before it's readable.
+- **Combine weak filters instead of chasing one strong one.** Neither "long subdomain label" nor
+  "isolated registered domain" is suspicious alone. Together, plus a rarity filter, they cut 5,063
+  domains to 15 rows.
+- **Shape matters as much as reputation.** This domain was on no threat feed. It stood out because
+  a brand name welded to a random string on free dynamic DNS is a shape that doesn't occur in
+  legitimate infrastructure.
+- **Thresholds are tuned, not derived.** ≥20 characters, ≤3 subdomains, <10 queries — each was
+  adjusted against the data until the output was both readable and complete. Same discipline as
+  detection tuning in Hunt #01.
 - **Layers answer different questions.** DNS said *what was asked*. HTTP said *what was sent*.
   Symantec said *which process*. Referrers said *how it started*. No single layer would have told
   this story.
