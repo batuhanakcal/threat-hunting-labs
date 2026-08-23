@@ -208,7 +208,7 @@ index=botsv3 (31.22.4.67 OR "igg.biz" OR 172.81.134.220 OR lightbodyfatburn)
 | SEPM | symantec:ep:packet:file | 46 (log relay for PCERF-L) |
 | splunkhwf.froth.ly | syslog | 8 (log relay) |
 
-No lateral spread. `SEPM` and `splunkhwf` are collectors reporting *about* PCERF-L, not victims —
+No lateral spread. `SEPM` and `splunkhwf` are collectors reporting *about* PCERF-L, not victims
 a reminder that Splunk's `host` field sometimes identifies the relay rather than the origin.
 
 **Process attribution** Sysmon should answer "which program made this connection" (EventID 3):
