@@ -130,7 +130,7 @@ index=botsv3 sourcetype=aws:cloudtrail (PutBucketAcl OR PutBucketPolicy OR PutOb
 
 Exactly two events, same user, same source IP: one opening the bucket, one closing it.
 
-**09:01:46 — bucket opened:**
+**09:01:46 bucket opened:**
 ```json
 "userName": "bstoll",  "eventName": "PutBucketAcl",  "bucketName": "frothlywebcode",
 "sourceIPAddress": "107.77.212.175",  "mfaAuthenticated": "false",
