@@ -86,7 +86,7 @@ one registered domain.
 
 | Registered domain | Distinct subdomains |
 |---|---|
-| in-addr.arpa | 2,731 (reverse DNS — normal) |
+| in-addr.arpa | 2,731 (reverse DNS normal) |
 | outlook.com | 161 |
 | froth.ly | 70 |
 
