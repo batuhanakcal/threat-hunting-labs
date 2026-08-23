@@ -23,7 +23,7 @@ deployment looks like. That ambiguity is the hunt.
 ![mars bash history s3-upload commands](../hunt-02-s3-images/hunt-02-S3-1.png)
 
 Notable detail: the command was run three times with varying `--file` values and a
-`sudo pip install boto3` in between — a human operator, typos and all, not automation.
+`sudo pip install boto3` in between a human operator, typos and all, not automation.
 
 ## Hypothesis
 
