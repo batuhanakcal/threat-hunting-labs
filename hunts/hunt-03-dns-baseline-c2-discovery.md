@@ -120,7 +120,7 @@ index=botsv3 sourcetype=stream:dns
 The two `rex` commands split each domain into its first label and its registered domain
 (`microsoftexchangeservervwu2g8sj20` and `igg.biz`). `eventstats dc(domain) by regdom` then
 attaches, to every row, how many distinct subdomains that registered domain has across the whole
-dataset — which is what separates an established service from a one-off.
+dataset, which is what separates an established service from a one-off.
 
 Thresholds were tuned against the data, the same way detection thresholds were tuned in Hunt #01:
 label length ≥20 keeps the list readable without dropping candidates, ≤3 subdomains excludes
@@ -409,7 +409,7 @@ requires tuning against the local environment (see Hunt #01's v1→v4 methodolog
 - **Shape matters as much as reputation.** This domain was on no threat feed. It stood out because
   a brand name welded to a random string on free dynamic DNS is a shape that doesn't occur in
   legitimate infrastructure.
-- **Thresholds are tuned, not derived.** ≥20 characters, ≤3 subdomains, <10 queries — each was
+- **Thresholds are tuned, not derived.** ≥20 characters, ≤3 subdomains, <10 queries each was
   adjusted against the data until the output was both readable and complete. Same discipline as
   detection tuning in Hunt #01.
 - **Layers answer different questions.** DNS said *what was asked*. HTTP said *what was sent*.
