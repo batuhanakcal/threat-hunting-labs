@@ -265,7 +265,7 @@ session and is unrelated. Narrowing to 11:07–11:11 isolates the compromise cha
 | 11:17:31 | platinum-casino.ru | /sver.sysfiles/bo | - |
 
 **11:08:35 is the moment of compromise.** The user arrived at `mans-alliance.com` from a Bing
-search — legitimate behavior on a legitimate e-commerce site. Seconds later the browser requests
+search; legitimate behavior on a legitimate e-commerce site. Seconds later, the browser requests
 `/vorcnrid/yp1mn.ya6`: a random path with a non-standard extension that no user would click. In
 the *same second*, contact with `lightbodyfatburn.net` begins.
 
@@ -273,7 +273,7 @@ This is the signature of a **drive-by compromise**: a legitimate site carrying i
 redirecting the visitor into an exploit/C2 chain. `platinum-casino.ru/zver/sysfiles/bo` is a
 second stage; "zver" is a folder name common in Russian-language malware distribution kits.
 
-Also noted: `piwik.alesco-concepts.com` was called from `schuetze-consult.de` — Piwik is analytics
+Also noted: `piwik.alesco-concepts.com` was called from `schuetze-consult.de`. Piwik is analytics
 software, frequently repurposed by attackers for victim tracking.
 
 ---
