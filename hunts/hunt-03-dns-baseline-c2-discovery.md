@@ -256,13 +256,13 @@ session and is unrelated. Narrowing to 11:07–11:11 isolates the compromise cha
 | 11:00:42 | schuetze-consult.de | /images, /right.gif | — (ordinary browsing) |
 | 11:07:39 | www.mans-alliance.com | /store/index.php | **bing.com** (legitimate search) |
 | **11:08:35** | **www.mans-alliance.com** | **/vorcnrid/yp1mn.ya6** | mans-alliance.com/store |
-| **11:08:35** | **lightbodyfatburn.net** | / | — |
-| 11:09:43 | igg.biz | / → /cgi-bin/ → /oauth/ | — |
+| **11:08:35** | **lightbodyfatburn.net** | / | - |
+| 11:09:43 | igg.biz | / → /cgi-bin/ → /oauth/ | - |
 | 11:10:18 | igg.biz | /oauth/RequestVerificationToken=… | C2 data transfer |
 | 11:13:20 | lightbodyfatburn.net | / | second beacon |
-| 11:14:06 | platinum-casino.ru | **/zver/sysfiles/bo** | — |
+| 11:14:06 | platinum-casino.ru | **/zver/sysfiles/bo** | - |
 | 11:15:22 | igg.biz | /oauth/RequestVerificationToken=… | C2 continues |
-| 11:17:31 | platinum-casino.ru | /sver.sysfiles/bo | — |
+| 11:17:31 | platinum-casino.ru | /sver.sysfiles/bo | - |
 
 **11:08:35 is the moment of compromise.** The user arrived at `mans-alliance.com` from a Bing
 search — legitimate behavior on a legitimate e-commerce site. Seconds later the browser requests
