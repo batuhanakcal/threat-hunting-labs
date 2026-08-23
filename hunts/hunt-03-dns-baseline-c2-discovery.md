@@ -253,7 +253,7 @@ session and is unrelated. Narrowing to 11:07–11:11 isolates the compromise cha
 
 | Time | Site | Path | Referrer |
 |---|---|---|---|
-| 11:00:42 | schuetze-consult.de | /images, /right.gif | — (ordinary browsing) |
+| 11:00:42 | schuetze-consult.de | /images, /right.gif | - (ordinary browsing) |
 | 11:07:39 | www.mans-alliance.com | /store/index.php | **bing.com** (legitimate search) |
 | **11:08:35** | **www.mans-alliance.com** | **/vorcnrid/yp1mn.ya6** | mans-alliance.com/store |
 | **11:08:35** | **lightbodyfatburn.net** | / | - |
