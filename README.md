@@ -9,7 +9,7 @@ are documented as thoroughly as positive ones, because in real hunting most hypo
 out, and knowing *why* they didn't is the point.
 
 **Author:** Batuhan Akcal · Cyber Security Engineer
-**Environment:** Splunk Enterprise (local), BOTS v3 dataset — ~2M events, 100+ sourcetypes
+**Environment:** Splunk Enterprise (local), BOTS v3 dataset ~2M events, 100+ sourcetypes
 **Methodology:** [PEAK](https://www.splunk.com/en_us/blog/security/peak-threat-hunting-framework.html) (Prepare · Execute · Act with Knowledge) + ABLE scoping
 
 ---
