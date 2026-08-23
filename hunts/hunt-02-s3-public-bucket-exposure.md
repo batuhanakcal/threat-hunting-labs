@@ -58,7 +58,7 @@ index=botsv3 "*memcac*" | stats count by sourcetype
 ![filename pivot across sourcetypes](../hunt-02-s3-images/hunt-02-S3-2.png)
 
 19 sourcetypes, 1,471 events. Most of it is noise from the **memcached service** itself
-(`ps` 832, `top` 416, `lsof`, `Unix:ListeningPorts`) — Frothly runs memcached, so the string
+(`ps` 832, `top` 416, `lsof`, `Unix:ListeningPorts`) Frothly runs memcached, so the string
 appears in process listings. The relevant hits:
 
 | Sourcetype | Count | Why it matters |
