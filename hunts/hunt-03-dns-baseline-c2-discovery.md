@@ -107,7 +107,7 @@ microsoftexchangeservervwu2g8sj20.igg.biz     3 queries
 Suspicious on two independent grounds:
 1. **Impersonation** "microsoftexchangeserver" followed by a random suffix. Deliberately built
    to look like Microsoft infrastructure in a log review.
-2. **Infrastructure** — `igg.biz` is not a Microsoft domain. It's a free dynamic-DNS provider,
+2. **Infrastructure** `igg.biz` is not a Microsoft domain. It's a free dynamic-DNS provider,
    commonly used for disposable C2 because it costs nothing and requires no identity.
 
 And only **3 queries** are the *least-frequently-occurring* principle. Noise repeats; attacks
