@@ -80,7 +80,7 @@ Hunts produce detections, not just reports. Rules built and threshold-tested aga
 | Public bucket grant | Hunt #02 | `PutBucketAcl` / `PutBucketPolicy` containing `AllUsers` near-zero false positives |
 | Anonymous S3 object access | Hunt #02 | Empty requester field on corporate buckets |
 | Brand impersonation on disposable DNS | Hunt #03 | Known brand string + free dynamic-DNS TLD |
-| Outbound-heavy GET | Hunt #03 | `bytes_out / bytes_in > 3` — a GET should download, not upload |
+| Outbound-heavy GET | Hunt #03 | `bytes_out / bytes_in > 3` a GET should download, not upload |
 | Path probing | Hunt #03 | ≥5 distinct paths on one site within a minute = automation |
 
 ---
