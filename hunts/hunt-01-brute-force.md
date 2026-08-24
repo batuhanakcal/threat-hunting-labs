@@ -21,7 +21,7 @@ within the BOTS v3 dataset timeframe.*
 | | |
 |---|---|
 | **Actor** | Unspecified, any external or internal attacker. No specific threat actor. |
-| **Behavior** | High volume of failed authentication attempts against one target, optionally followed by a success (MITRE **T1110 — Brute Force**). |
+| **Behavior** | High volume of failed authentication attempts against one target, optionally followed by a success (MITRE **T1110 Brute Force**). |
 | **Location** | Authentication surfaces: web application login (`access_combined`) and VPN/firewall (`cisco:asa`). |
 | **Evidence** | Repeated POST requests to login endpoints; failed-auth log messages; abnormal request volume from a single source. |
 
