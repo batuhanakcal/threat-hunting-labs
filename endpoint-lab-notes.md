@@ -1,4 +1,4 @@
-# Week 5: Endpoint Telemetry Lab (Sysmon to Splunk Pipeline) & Hunt #04
+# Week 5: Endpoint Telemetry Lab (Sysmon to Splunk Pipeline)
 
 > **Goal of Month 2:** Close the endpoint-visibility gap that blocked Hunt #03.
 > In BOTS v3 I could see *that* a connection happened, but not *which process*
