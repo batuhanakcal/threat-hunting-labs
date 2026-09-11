@@ -224,7 +224,7 @@ response bytes, exact object key, request ID, and source ownership. A 206 respon
 a partial read; a successful request count is not a count of complete, distinct archive copies.
 Confirm the warning-file PUT and its timestamp before stating it was written during the interval.
 
-## Candidate detections — revised queries pending validation
+## Engineer detections revised queries pending validation
 
 ### Rule 1: Successful public bucket ACL change
 
