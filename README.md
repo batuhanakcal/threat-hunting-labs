@@ -58,13 +58,13 @@ timeline suggests a possible drive-by chain, with the exact compromise mechanism
 The investigation also separated Splunk collector activity from a misleading endpoint alert
 and documented limited Sysmon process attribution for the connections of interest.
 
-## Candidate detections
+## Engineer detections
 
 These are investigation queries and detection proposals. Production scheduling, independent
 validation, and measured false-positive rates are not yet documented. Newly revised queries
 are marked as pending validation in the reports.
 
-| Candidate | Source | Signal and qualification |
+| Engineer | Source | Signal and qualification |
 |---|---|---|
 | Repeated authentication failures | Hunt #01 | Deferred until failure logging and field extraction are verified |
 | Public bucket ACL grant | Hunt #02 | Successful `PutBucketAcl` with an `AllUsers` grant; policy changes require a separate review |
