@@ -90,4 +90,4 @@ Hunts produce detections, not just reports. Rules built and threshold-tested aga
 - **[spl-notes.md](spl-notes.md)** - personal SPL reference: each query with what it does and *when it should come to mind*
 - **[stats-family-explained.md](stats-family-explained.md)** - `stats` vs `eventstats` vs `streamstats`: fixed vs flowing baselines
 - **[peak-framework-notes.md](peak-framework-notes.md)** - PEAK's three hunt types, the ABLE scoping model, and how to fill it in
-- **[endpoiny-lab-notes.md](endpoint-lab-notes.md)**
+- **[endpoint-lab-notes.md](endpoint-lab-notes.md)** - Created endpoint labs for new hunts.
