@@ -254,7 +254,7 @@ index=botsv3 sourcetype=aws:s3:accesslogs
 Catches the case where a bucket is public via policy rather than ACL, or where the grant
 predates the monitoring window.
 
-## Lessons learned
+## Important Notes
 
 - **A hunt can start from an observation, not a topic.** Hunt #01 started with a threat technique
   (brute force) and found nothing. This one started with a single odd command in `bash_history`
