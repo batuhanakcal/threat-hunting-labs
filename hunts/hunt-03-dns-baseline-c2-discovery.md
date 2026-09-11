@@ -427,7 +427,7 @@ historical lab dataset.
    beyond those indicators. Review business impact and present-day ownership before blocking
    shared infrastructure or an entire DNS suffix.
 
-## Candidate detections — revised queries pending validation
+## Candidate detections revised queries pending validation
 
 These queries produce review leads. No production false-positive rate or detection coverage is
 claimed. Record the time range, field coverage, result count, inspected benign examples, and
