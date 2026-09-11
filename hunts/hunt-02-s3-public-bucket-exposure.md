@@ -1,276 +1,295 @@
 # Hunt #02 Public S3 Bucket Exposure (`frothlywebcode`)
 
 **Type:** Hypothesis-driven, pivot-led (PEAK)
-**Environment:** Splunk BOTS v3 (Frothly), all-time
-**Threat Hunter:** Batuhan Akcal
-**Status:** Closed **hypothesis confirmed, finding validated**
 
----
+**Environment:** Splunk BOTS v3 (Frothly), original discovery searches: All time
+
+**Threat Hunter:** Batuhan Akcal
+
+**Status:** Public ACL grants observed; successful-access impact requires validation
+
+## Executive assessment
+
+CloudTrail records show `AllUsers` READ and WRITE bucket ACL grants, followed by their removal
+**56 minutes 8 seconds** later. S3 logs contain anonymous object requests and a warning-file key.
+Those observations establish an exposure concern, but the saved aggregations do not establish
+successful download counts, an anonymous write, or the identity of an external party.
+
+**Confidence:** High in the ACL change shown in the raw CloudTrail screenshot; successful object
+access and downstream impact remain unresolved. Integrity and confidentiality both need review.
+**Time:** CloudTrail `eventTime` gives **2018-08-20 13:01:46Z–13:57:54Z**. The same screenshot
+renders `_time` as 09:01:46–09:57:54, a **UTC−04:00 display offset**. Other sources must be checked
+against their raw timestamps before combining them into a definitive cross-source timeline.
 
 ## How this hunt started
 
-Unlike Hunt #01, this hunt did not begin with a threat-intel topic. It began with an
-**observation in the data**: while reviewing `bash_history`, a command stood out on host `mars`:
+While reviewing `bash_history`, a command stood out on host `mars`:
 
-```
+```text
 python /home/ec2-user/tools/s3-upload.py --bucket frothlywebcode --file frothly_web_memcaced.tar.gz --target frothly_html_memcached.tar.gz
 ```
 
-An archive being pushed to cloud storage is exactly what data exfiltration looks like
-(MITRE **T1567.002 Exfiltration to Cloud Storage**). It is also exactly what a normal
-deployment looks like. That ambiguity is the hunt.
+An archive upload may be a normal deployment or part of data staging/exfiltration. The command
+alone does not establish intent. That ambiguity led to the investigation.
 
 ![mars bash history s3-upload commands](../hunt-02-s3-images/hunt-02-S3-1.png)
 
-Notable detail: the command was run three times with varying `--file` values and a
-`sudo pip install boto3` in between a human operator, typos and all, not automation.
+Three invocations with changing `--file` values and an intervening `sudo pip install boto3`
+are consistent with interactive troubleshooting, but do not by themselves identify the operator.
 
-## Hypothesis
+## Hypothesis and scope
 
-> **If** the `frothlywebcode` bucket was exposed or misused,
-> **then** S3 access logs will show access to this file that cannot be explained by
-> Frothly's own infrastructure, specifically requests without an authenticated identity.
+> If the bucket's permissions allowed unintended public access, permission-change events and
+> successful anonymous object operations should establish when access was possible and whether
+> it was used. Request identity, response status, and asset ownership need separate checks.
 
-## ABLE
-
-| | |
+| ABLE | Scope |
 |---|---|
-| **Actor** | Unspecified. Could be an insider, an external scanner, or a misconfiguration with no actor at all. |
-| **Behavior** | Data staged into cloud storage and retrieved by parties outside the organization (T1567.002 / T1530 Data from Cloud Storage Object). |
-| **Location** | `aws:s3:accesslogs`, `aws:cloudtrail`, `bash_history`. |
-| **Evidence** | S3 requester field: an IAM/STS ARN means authenticated; a bare `-` means **anonymous**. Anonymous GETs against a corporate bucket are not normal. |
+| Actor | Unspecified; administrative error and unauthorized access are alternative explanations |
+| Behavior | Public permission changes and possible access to deployment artifacts |
+| Location | `aws:s3:accesslogs`, `aws:cloudtrail`, `bash_history` |
+| Evidence | ACL/policy grants; requester, operation, HTTP response, bytes sent, and timestamps |
 
-**Stop condition:** determine whether the file was accessed by unauthenticated parties, and if
-so, when and why the bucket allowed it. Content-level analysis of the archive itself is out of
-scope (Splunk holds logs, not file contents).
-
----
+**Stop condition:** Document the grants and observed requests, then identify the remaining
+checks needed to establish impact. Archive contents and actual deployment behavior are outside
+the available evidence. T1567.002 and T1530 are investigation hypotheses, not confirmed technique
+mappings based solely on an upload or anonymous request.
 
 ## Execute
 
-### Step 1: Pivot on the filename across all data
+### Step 1: Pivot on the filename
 
-The filename is the entity here, not an IP. Field-blind search across the whole index:
-
-```
+```spl
 index=botsv3 "*memcac*" | stats count by sourcetype
 ```
+
 ![filename pivot across sourcetypes](../hunt-02-s3-images/hunt-02-S3-2.png)
 
-19 sourcetypes, 1,471 events. Most of it is noise from the **memcached service** itself
-(`ps` 832, `top` 416, `lsof`, `Unix:ListeningPorts`) Frothly runs memcached, so the string
-appears in process listings. The relevant hits:
+The search returned 19 sourcetypes and 1,471 events. Much of the volume concerned the memcached
+service (`ps`: 832; `top`: 416), rather than the archive. Relevant sources included:
 
 | Sourcetype | Count | Why it matters |
 |---|---|---|
-| `aws:s3:accesslogs` | 41 | The file actually reached S3 |
+| `aws:s3:accesslogs` | 41 | Requests involving the archive name |
 | `aws:cloudtrail` | 2 | Bucket-level API activity |
-| `code42:security` | 11 | A DLP/backup product observed the file |
-| `bash_history` | 3 | The upload commands |
+| `code42:security` | 11 | File-related telemetry |
+| `bash_history` | 3 | Upload commands |
 
-### Step 2: What happened to the file in S3?
+### Step 2: What operations were requested?
 
-```
+```spl
 index=botsv3 sourcetype=aws:s3:accesslogs "*memcac*"
 | rex field=_raw "(?<operation>REST\.\w+\.\w+)"
 | stats count by operation | sort - count
 ```
+
 ![S3 operation breakdown](../hunt-02-s3-images/hunt-02-S3-3.png)
 
 | Operation | Count |
 |---|---|
-| `REST.GET.OBJECT` | **17** |
+| `REST.GET.OBJECT` | 17 |
 | `REST.HEAD.OBJECT` | 14 |
 | `REST.GET.BUCKETVERSIONS` | 3 |
-| `REST.PUT.OBJECT` | **3** |
+| `REST.PUT.OBJECT` | 3 |
 | `REST.GET.ACL` | 2 |
 | `REST.GET.BUCKET` | 1 |
 | `REST.OPTIONS.PREFLIGHT` | 1 |
 
-**Three uploads, seventeen downloads.** A deployment artifact being pulled six times more often
-than it is pushed deserves an explanation. (Note: in S3, uploads are `PUT`, not `POST`; the
-form-style `POST` of web apps doesn't apply here.)
+These are **request counts**. An operation name alone does not establish success: a GET can
+receive 403 or 404. Multiple reads per upload can also be normal deployment behavior.
 
-### Step 3: Were the downloads authenticated?
+### Step 3: Which object GET requests were anonymous?
 
-This is the decisive test. In S3 access logs, the requester field carries an IAM/STS ARN for
-authenticated calls and a bare `-` for anonymous ones:
-
-```
+```spl
 index=botsv3 sourcetype=aws:s3:accesslogs "*memcac*" REST.GET.OBJECT
 | rex field=_raw "\] (?<src_ip>\d+\.\d+\.\d+\.\d+) (?<requester>\S+)"
 | stats count by src_ip, requester | sort - count
 ```
-![authenticated vs anonymous downloads](../hunt-02-s3-images/hunt-02-S3-4.png)
+
+![authenticated vs anonymous requests](../hunt-02-s3-images/hunt-02-S3-4.png)
 
 | Source IP | Requester | Count |
 |---|---|---|
 | 107.77.212.175 | `arn:aws:iam::622676721278:user/bstoll` | 4 |
-| 52.53.233.88 | **`-` (anonymous)** | **2** |
+| 52.53.233.88 | `-` (anonymous) | 2 |
 | 52.53.233.88 | `assumed-role/EC2InstanceRole` | 2 |
-| 54.183.247.244 | **`-` (anonymous)** | **2** |
+| 54.183.247.244 | `-` (anonymous) | 2 |
 | 54.183.247.244 | `assumed-role/EC2InstanceRole` | 2 |
-| 54.67.37.214 | **`-` (anonymous)** | **2** |
+| 54.67.37.214 | `-` (anonymous) | 2 |
 | 54.67.37.214 | `assumed-role/EC2InstanceRole` | 2 |
-| 35.182.246.222 | **`-` (anonymous)** | **1** |
+| 35.182.246.222 | `-` (anonymous) | 1 |
 
-**7 of 17 downloads were anonymous.** The bucket was serving this object to the internet without
-authentication. `35.182.246.222` is particularly notable: anonymous only, no matching EC2 role,
-using `aws-cli` from outside Frothly's infrastructure.
+**Seven of 17 GET requests were anonymous.** Six came from IPs also observed using a Frothly
+EC2 role. The remaining IP merits asset-ownership review; absence of a role in this table does
+not establish that it was external. Anonymous identity is distinct from response success.
 
-**Hypothesis confirmed.** Now: why was it open, and for how long?
+The original regex covers IPv4 addresses only. The follow-up parser below accepts an address
+token without that restriction. See [AWS's log field definitions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/LogFormat.html).
 
-### Step 4: Who opened the bucket, and when?
+### Step 4: Who changed the bucket ACL, and when?
 
-```
+```spl
 index=botsv3 sourcetype=aws:cloudtrail (PutBucketAcl OR PutBucketPolicy OR PutObjectAcl)
 | table _time, _raw
 ```
-![PutBucketAcl events](../hunt-02-s3-images/hunt-02-S3-5.png)
 
-Exactly two events, same user, same source IP: one opening the bucket, one closing it.
+![PutBucketAcl events with raw UTC eventTime](../hunt-02-s3-images/hunt-02-S3-5.png)
 
-**09:01:46 bucket opened:**
-```json
-"userName": "bstoll",  "eventName": "PutBucketAcl",  "bucketName": "frothlywebcode",
-"sourceIPAddress": "107.77.212.175",  "mfaAuthenticated": "false",
-"Grantee": {"URI": ".../groups/global/AllUsers"}, "Permission": "READ",
-"Grantee": {"URI": ".../groups/global/AllUsers"}, "Permission": "WRITE"
-```
+Two `PutBucketAcl` events name `bstoll`, from `107.77.212.175`, with
+`mfaAuthenticated: false`. The screenshot shows:
 
-`global/AllUsers` is AWS's "everyone on the internet." The grant included **WRITE as well as
-READ**, meaning anyone could not only download from the bucket but also upload to it.
+| Raw `eventTime` (UTC, 2018-08-20) | Displayed `_time` | ACL change |
+|---|---|---|
+| 13:01:46Z | 09:01:46 | `AllUsers` receives READ and WRITE |
+| 13:57:54Z | 09:57:54 | `AllUsers` grants removed |
 
-**09:57:54 bucket closed:** the same API call, same user, with `AllUsers` removed from the
-grant list. Only `bstoll` and `LogDelivery` remain.
+`AllUsers` includes unauthenticated users. **Bucket READ permits listing objects; it does not
+itself grant object downloads.** Bucket WRITE grants object-write capabilities. Establishing
+whether a particular existing archive could be replaced also requires ownership/version and
+effective-permission checks. Object ACLs and bucket policies must be reviewed separately.
+[AWS ACL permission semantics](https://docs.aws.amazon.com/AmazonS3/latest/userguide/acl-overview.html)
 
-### Step 5: Impact: what was in the bucket?
+The interval between these recorded changes is 56 minutes 8 seconds. Removing these grants
+does not by itself prove all public access ended: an object ACL or bucket policy could still
+allow reads. Effective access and intervening changes need verification.
 
-Splunk holds logs, not file contents, so the archive itself can't be opened. But the bucket
-inventory answers the question indirectly:
+### Step 5: Which object keys appear in requests?
 
-```
+```spl
 index=botsv3 sourcetype=aws:s3:accesslogs frothlywebcode
 | rex field=_raw "REST\.\w+\.\w+ (?<object>\S+)"
 | stats count by object | sort - count
 ```
-![bucket object inventory](../hunt-02-s3-images/hunt-02-S3-6.png)
 
-| Object | Count |
+![object keys appearing in access logs](../hunt-02-s3-images/hunt-02-S3-6.png)
+
+| Key grouping in the screenshot | Count |
 |---|---|
 | `-` (bucket-level operations) | 131 |
 | `frothly_html_memcached.tar.gz` | 24 |
-| **`OPEN_BUCKET_PLEASE_FIX.txt`** | **2** |
+| `OPEN_BUCKET_PLEASE_FIX.txt` | 2 |
+| Encoded/prefixed archive-name variant | 1 |
 
-**Someone found the open bucket and left a file in it.** The name says it outright:
-*OPEN_BUCKET_PLEASE_FIX*. This is a well-known internet phenomenon for scanners and researchersto 
-sweep for publicly writable S3 buckets and drop warning files in the ones they find.
+The warning-file name is a useful lead. A key in an access-log request is **not a complete bucket
+inventory**, and does not prove that the object exists or that a write succeeded. Inspect the
+operation, requester, response, and time for those two records before attributing a warning-file
+upload to a third party. Review the encoded key separately instead of silently merging it.
 
-This single object proves three things at once:
-1. The exposure was discovered by a third party, not just theoretically possible.
-2. The **WRITE** grant was genuinely exploitable; someone wrote to Frothly's bucket.
-3. It happened fast enough to land inside a 56-minute window.
+## Working timeline
 
----
+The ACL times are supported by raw UTC fields in the screenshot. Other rows preserve the
+original investigation notes and need raw-event confirmation, including response status.
 
-## Timeline
+| Display time (2018-08-20) | Observation or note | Evidence status |
+|---|---|---|
+| 09:01:46 | `AllUsers` READ + WRITE granted | Raw CloudTrail screenshot; 13:01:46Z |
+| 09:03:46 | Anonymous archive GET request | Original note; response status/time to verify |
+| 09:04:17 | Archive PUT request, 35.182.246.222 | Original note; success and identity to verify |
+| 09:33:34–09:33:38 | Anonymous and EC2-role GET requests | Original note; successful transfers to count |
+| 09:57:54 | `AllUsers` grants removed | Raw CloudTrail screenshot; 13:57:54Z |
+| 09:59:18 | Permission/version checks | Original note; occurs after grant removal |
+| Time not established | Requests naming `OPEN_BUCKET_PLEASE_FIX.txt` | Key count shown; operation and timing unverified |
 
-| Time (2018-08-20) | Event |
-|---|---|
-| 09:01:46 | `bstoll` grants `AllUsers` **READ + WRITE** on `frothlywebcode` (MFA: false) |
-| 09:03:46 | Anonymous `GET` of `frothly_html_memcached.tar.gz` |
-| 09:04:17 | `PUT` archive uploaded (35.182.246.222) |
-| 09:33:34–09:33:38 | Multiple anonymous + EC2-role downloads |
-| ~09:5x | `OPEN_BUCKET_PLEASE_FIX.txt` appears in the bucket |
-| 09:59:18 | `bstoll` starts checking permissions (`REST.GET.ACL`, `GET.BUCKETVERSIONS`) |
-| 09:57:54 | `bstoll` removes `AllUsers` bucket closed |
+The ordering does not establish that the administrator discovered the issue through the later
+permission checks. The reason for granting or removing access is not recorded here.
 
-**Exposure window: ~56 minutes.** Seven anonymous downloads and at least one anonymous write
-occurred inside it.
+## Verdict and impact
 
-## Verdict
+**Public bucket ACL grants are documented. Successful anonymous access and the full impact
+remain to be established.** Administrative error is plausible, but the actor's intent cannot be
+resolved from this sequence alone.
 
-**Confirmed finding public S3 bucket exposure with third-party access.**
+The upload command and archive name suggest deployment code. A write grant raises an integrity
+concern if unauthorized artifacts can enter a deployment workflow. No replaced artifact or
+malicious deployment is demonstrated in the saved evidence. Confidentiality remains unresolved:
+object names do not reveal whether an archive contains source code, secrets, or personal data.
 
-On 2018-08-20, the IAM user `bstoll` granted `AllUsers` (public internet) both READ and WRITE
-permissions on the `frothlywebcode` bucket, from an **MFA-unauthenticated session**. During the
-~56-minute exposure window, the bucket's contents were downloaded anonymously seven times, and an
-external party wrote a file into it (`OPEN_BUCKET_PLEASE_FIX.txt`) demonstrating the write
-permission was exploitable. The user detected the issue himself and revoked the grant.
+## Follow-up validation — proposed, not yet run
 
-**Assessment: misconfiguration, not malicious insider activity.** The pattern open, brief
-window, self-detection via ACL checks, self-remediation is consistent with an administrative
-mistake rather than deliberate exfiltration. But the exposure was real and was found by someone
-outside the organization.
+Use an explicit time range that includes the ACL interval and surrounding activity. Check
+Splunk display timezone against the raw S3 timestamp offset and CloudTrail `eventTime` first.
+The following parser targets the space-delimited S3 format in this lab. Validate it against
+raw records, especially quoted request URIs, before relying on its output.
 
-## Impact
+```spl
+index=botsv3 sourcetype=aws:s3:accesslogs frothlywebcode
+| rex field=_raw "^\S+\s+(?<bucket>\S+)\s+\[(?<request_time>[^\]]+)\]\s+(?<src_ip>\S+)\s+(?<requester>\S+)\s+(?<request_id>\S+)\s+(?<operation>\S+)\s+(?<object>\S+)\s+\"(?<request_uri>.*?)\"\s+(?<http_status>\d{3})\s+(?<error_code>\S+)\s+(?<bytes_sent>\S+)\s+(?<object_size>\S+)"
+| eval parse_status=if(isnull(http_status),"UNPARSED","parsed")
+| table _time request_time parse_status bucket src_ip requester request_id operation object http_status error_code bytes_sent object_size _raw
+| sort 0 _time
+```
 
-`frothlywebcode` is a web-code/deployment bucket; the only real object is a 3 MB web archive
-(`frothly_html_memcached.tar.gz`). No customer data or credentials were identified in the bucket
-inventory, so this is **not a data breach of sensitive records**.
+Retain and investigate **UNPARSED** rows. Then verify successful object GET/PUT operations,
+response bytes, exact object key, request ID, and source ownership. A 206 response can represent
+a partial read; a successful request count is not a count of complete, distinct archive copies.
+Confirm the warning-file PUT and its timestamp before stating it was written during the interval.
 
-The severity is on the **integrity** side, not confidentiality:
+## Candidate detections — revised queries pending validation
 
-1. **WRITE access to a deployment bucket is a supply-chain risk.** An attacker could have
-   replaced the web archive with a malicious version, which would then be deployed to Frothly's
-   website and served to every visitor. This is materially worse than the data being read.
-2. **Exploitability was proven**, not theoretical; a third party successfully wrote to the bucket.
-3. The web archive itself left the organization seven times; if it contains configuration files
-   or embedded credentials, that is a secondary exposure requiring review.
+### Rule 1: Successful public bucket ACL change
+
+```spl
+index=botsv3 sourcetype=aws:cloudtrail
+| spath
+| search eventName=PutBucketAcl
+| where isnull(errorCode)
+| search "global/AllUsers"
+| spath path=userIdentity.userName output=actor
+| spath path=requestParameters.bucketName output=bucket
+| spath path=userIdentity.sessionContext.attributes.mfaAuthenticated output=mfa_authenticated
+| table _time eventTime actor sourceIPAddress bucket mfa_authenticated _raw
+```
+
+This is a detective alert candidate, not prevention. Review the actual grantee/permission pairs
+and approved public-bucket exceptions. No false-positive rate or scheduled-alert latency is
+measured. `AllUsers` string matching does **not** cover public bucket policies, which may use
+`Principal: "*"`. A separate review query is:
+
+```spl
+index=botsv3 sourcetype=aws:cloudtrail
+| spath
+| search eventName=PutBucketPolicy
+| where isnull(errorCode)
+| spath path=requestParameters.bucketName output=bucket
+| spath path=requestParameters.bucketPolicy output=bucket_policy
+| table _time eventTime userIdentity.arn sourceIPAddress bucket bucket_policy _raw
+```
+
+Inspect every policy statement's Effect, Principal, Action, Resource, and Condition together.
+Also review `PutObjectAcl` and existing policies when establishing effective object access.
+`AuthenticatedUsers` is a separate broad-access ACL group covering AWS accounts, not synonymous
+with anonymous public access.
+
+### Rule 2: Successful anonymous object operations
+
+Use the validated parser from the follow-up query above, then replace its final `table`/`sort`
+with this pipeline:
+
+```spl
+| where requester="-" AND http_status>=200 AND http_status<300
+  AND (operation="REST.GET.OBJECT" OR operation="REST.PUT.OBJECT")
+| eval bytes_sent_num=tonumber(bytes_sent)
+| stats count as successful_requests sum(bytes_sent_num) as response_bytes
+  dc(src_ip) as distinct_sources values(http_status) as statuses by bucket operation object
+```
+
+Audit parser coverage before filtering. Null byte values must not be presented as confirmed zero
+transfer. An anonymous successful request can be expected for a deliberately public resource;
+apply bucket-purpose context before alerting. [Validation record requirements](../validation-notes.md)
 
 ## Recommendations
 
-1. **Enable S3 Block Public Access** at the account level so `AllUsers` grants cannot be applied
-   to any bucket, regardless of individual user action.
-2. **Enforce MFA on IAM users.** This change was made from a session with `mfaAuthenticated: false`
-   the same gap identified in Hunt #01.
-3. **Alert on `PutBucketAcl` / `PutBucketPolicy` containing `AllUsers` or `AuthenticatedUsers`.**
-   This is a high-signal, low-noise detection (see below).
-4. **Review the contents of the exposed archive** for embedded configuration or credentials.
-5. **Investigate the origin of `OPEN_BUCKET_PLEASE_FIX.txt`** and confirm nothing else was written
-   or modified during the window.
-
-## Detection
-
-Unlike Hunt #01, the required signal exists in this environment today. Two complementary rules:
-
-**Rule 1 public grant (preventive, fires at the moment of exposure):**
-```
-index=botsv3 sourcetype=aws:cloudtrail (eventName=PutBucketAcl OR eventName=PutBucketPolicy)
-"global/AllUsers"
-| table _time, userName, sourceIPAddress, bucketName
-```
-Very low false-positive rate: legitimately granting the whole internet access to a corporate
-bucket is almost never intentional. This is the rule that would have caught the incident at
-09:01:46 instead of 56 minutes later.
-
-**Rule 2 anonymous object access (detective, fires when exposure is used):**
-```
-index=botsv3 sourcetype=aws:s3:accesslogs
-| rex field=_raw "\] (?<src_ip>\d+\.\d+\.\d+\.\d+) (?<requester>\S+)"
-| where requester="-"
-| stats count dc(src_ip) as distinct_sources by bucket
-```
-Catches the case where a bucket is public via policy rather than ACL, or where the grant
-predates the monitoring window.
+1. Review account/bucket S3 Block Public Access and object ownership settings; verify effective
+   permissions after remediation, including object ACLs and policies.
+2. Review the IAM user's permissions and MFA enforcement appropriate to the access path.
+3. Preserve and validate the successful request evidence and warning-file origin.
+4. Inspect archive contents and deployment consumption before deciding confidentiality or
+   integrity impact. Check object versions/hashes and other writes in the interval.
+5. Validate the candidate detections against approved public access and denied requests.
 
 ## Important Notes
 
-- **A hunt can start from an observation, not a topic.** Hunt #01 started with a threat technique
-  (brute force) and found nothing. This one started with a single odd command in `bash_history`
-  and found a real incident. Both are valid PEAK entry points, but ambient anomalies in your own
-  data are often the richer source.
-- **Pivot on the entity, whatever the entity is.** The pivot technique that worked on an IP in
-  earlier work worked identically on a *filename*. The entity is whatever ties events together.
-- **In cloud logs, identity is the discriminator.** Volume told me nothing (3 uploads, 17
-  downloads is just a number). The `-` in the requester field is what turned counting into a
-  finding. Learn each source's success/identity semantics before hunting in it.
-- **Broad search terms sweep in noise.** `*memcac*` matched the memcached *service* as well as the
-  filename 832 hits in `ps` alone. Always separate the string you meant from the string you got.
-- **Not every finding is an attacker.** The most likely reading here is an administrator's mistake.
-  A hunter's job is to report what the evidence supports, not to promote a misconfiguration into
-  an intrusion. The severity comes from the WRITE grant and the proven third-party access, not
-  from an assumed adversary.
-- **The impact question is part of the hunt.** "The bucket was open" is incomplete. "The bucket was
-  open, it held deployment code, WRITE was granted, and someone used it" is a finding a business
-  can act on.
+- A filename can connect shell history, cloud API activity, and object access logs.
+- Request identity, response success, resource permissions, and source ownership answer different questions.
+- Aggregated keys are not a complete inventory; object names do not establish content sensitivity.
+- Preserve uncertainty about intent while making the documented permission change actionable.
