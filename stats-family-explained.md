@@ -11,7 +11,7 @@ Splunk's three aggregation commands look similar but differ in one thing:
 |---------|------------------|-----------|------------------|
 | `stats` | groups events, collapses them | **reduced** | no |
 | `eventstats` | the **entire** result set | **kept** | no |
-| `streamstats` | **only the preceding rows** | **kept** | **yes** — `sort` first |
+| `streamstats` | Rows seen so far, including current by default; `current=f` excludes it | **kept** | **yes** |
 
 One-line rule: **need fewer rows → stats. Need a column added → eventstats (whole table) or streamstats (running).**
 
@@ -53,11 +53,13 @@ index=botsv3 sourcetype=access_combined
 
 ---
 
-## 3. streamstats - real-time (sees only the past)
+## 3. streamstats - running calculations in row order
 
 Walks the rows **in order** and calculates using **only the rows seen so far**. Each row gets a different result. Because it depends on what came before, it **is** order-sensitive → always `sort _time` first.
 
-Think of a teacher who grades papers as they arrive and writes the running average on each; the first paper knows only itself, the last paper knows them all.
+The current row is included by default (`current=true`); use `current=f` to exclude it.
+The example below includes the current row. Use `sort 0 _time` for the chronological examples
+to retain all rows rather than imposing the default sort result limit.
 
 Same values 100, 50, 200, 30:
 ```
@@ -69,22 +71,26 @@ Same values 100, 50, 200, 30:
 
 ### Two modes
 
-**Windowless** accumulates from the very start (running total/count):
+**Without an explicit window**, calculates a running result. Applicable memory/event limits still matter; it is not unlimited history:
 ```
-| sort _time | streamstats count as running_count
+| sort 0 _time | streamstats count as running_count
 ```
 
-**Windowed** (`window=N`) — looks back only at the last N rows (moving average). This is what catches sudden spikes:
+**Windowed** (`current=f window=N`) — compares against the preceding N rows. This revised
+example requires a full five-row baseline and a positive average; it has not been rerun on BOTS v3:
 ```
 index=botsv3 sourcetype=access_combined
 | bin _time span=1h
 | stats count as hits by _time
-| sort _time
-| streamstats window=5 avg(hits) as moving_avg
+| sort 0 _time
+| streamstats current=f window=5 count(hits) as baseline_rows avg(hits) as moving_avg
+| where baseline_rows=5 AND moving_avg>0
 | eval spike = hits / moving_avg
 | where spike > 3
 ```
-"Is this hour a spike vs the last 5 hours?" A fixed baseline can miss this; a flowing one catches it.
+"Is this hour a spike relative to the preceding five observed hourly buckets?" Missing hours
+are absent from this `stats` output. Use a bounded, continuous `timechart` if the comparison
+must represent five consecutive hours.
 
 **Note:** the time granularity ("hourly") comes from `bin span=1h`, NOT from streamstats. Streamstats just flows over whatever rows it's given; change the span to change the granularity.
 
@@ -97,4 +103,8 @@ index=botsv3 sourcetype=access_combined
 
 Attacks are often sudden jumps, so streamstats catches things a fixed baseline smooths over. Best hunters use both and cross-check: if two independent methods flag the same entity/time window, confidence goes up.
 
-*(In BOTS v3, streamstats independently flagged the 09:00 traffic spike (3.3×) the same hour the hypothesis-driven hunt found the __main__/0.2 forum crawler. Two methods, one time window = stronger finding.)*
+The original exploratory notes recorded a 3.3× spike with the earlier query that included the
+current row. That historical value is not a result of the corrected `current=f` query. A new
+run is required before claiming its output or detection effectiveness.
+
+Reference: [Splunk streamstats documentation](https://help.splunk.com/en/splunk-enterprise/search/spl-search-reference/9.0/search-commands/streamstats).

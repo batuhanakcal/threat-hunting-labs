@@ -10,7 +10,7 @@ All three share the same three phases (Prepare / Execute / Act).
 
 ## The 3 phases (common to every hunt)
 
-- **Prepare** - pick topic, research it, form the plan, scope it (systems, data, timeframe). Set a max hunt duration ("3 days, if nothing found, it's probably not happening").
+- **Prepare** - pick topic, research it, form the plan, and scope systems, data, and timeframe. Set a maximum hunt duration; reaching it without a finding does not establish that the activity is absent.
 - **Execute** - gather data, pre-process/clean it, analyze (find patterns/anomalies/evidence), refine as you learn, escalate anything malicious to IR immediately.
 - **Act** - preserve the hunt (archive data + method), document findings (the "so what?"), create detections, re-add new ideas to the backlog, communicate to stakeholders.
 
@@ -78,11 +78,11 @@ Uses algorithms/ML (clustering, classification, anomaly detection, time-series) 
 
 ---
 
-## How this maps to my own work (BOTS v3, Hunt #1)
+## How this maps to my own work
 
-- I did a **hypothesis-driven hunt** without knowing the name: "is something non-human talking to the web server?" → ABLE: Actor=unknown, Behavior=web enumeration, Location=internet-facing web server (access_combined), Evidence=web logs (non-browser UA, high-variety requests).
+- Earlier exploratory web-log exercises asked whether automated clients were enumerating the web server. Those exercises are separate from the numbered [Hunt #01 authentication report](hunts/hunt-01-brute-force.md).
 - My baseline work (median/stdev/MAD/percentile) = the **"Review distributions" + "Investigate outliers"** steps of a baseline hunt. My `avg ± 2*stdev` band = a **z-score** test (the formal name).
-- My detection v1→v4 = the **"Create detections"** step of the Act phase.
+- Creating and validating detection candidates implements the **Act** phase. The current numbered reports do not include a v1→v4 tuning record or a measured false-positive rate.
 - Noting ELB health-checker as noise = documenting a **known-benign outlier**.
 
 ## Two terms to remember

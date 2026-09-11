@@ -1,93 +1,89 @@
 # Threat Hunting Labs
 
-Hypothesis-driven threat hunting on the Splunk **Boss of the SOC v3 (BOTS v3)** dataset,
-documented end-to-end using the **PEAK** framework.
-
-Each hunt starts from a question, not an alert, not an IOC list, and is written up with the
-queries, the evidence, the false leads, and the reasoning behind every decision. Negative results
-are documented as thoroughly as positive ones, because in real hunting most hypotheses don't pan
-out, and knowing *why* they didn't is the point.
+Threat hunting on the Splunk **Boss of the SOC v3 (BOTS v3)** dataset, documented using the
+**PEAK** framework. Each report records the question, queries, observations, alternative
+explanations, and the reasoning behind the next pivot. Findings include suspicious activity,
+telemetry limitations, and candidate detections.
 
 **Author:** Batuhan Akcal · Cyber Security Engineer
-**Environment:** Splunk Enterprise (local), BOTS v3 dataset ~2M events, 100+ sourcetypes
-**Methodology:** [PEAK](https://www.splunk.com/en_us/blog/security/peak-threat-hunting-framework.html) (Prepare · Execute · Act with Knowledge) + ABLE scoping
 
----
+**Environment:** Splunk Enterprise (local), BOTS v3 dataset ~2M events, 100+ sourcetypes
+
+**Methodology:** [PEAK](https://www.splunk.com/en_us/blog/security/peak-threat-hunting-framework.html)
+(Prepare · Execute · Act with Knowledge) + ABLE scoping
 
 ## Hunts
 
 ### [Hunt #01 Brute-Force Authentication](hunts/hunt-01-brute-force.md)
-**Type:** Hypothesis-driven · **Result:** Hypothesis disproved · **Finding:** visibility gaps
 
-Tested for brute-force activity across **six authentication surfaces**: web application, VPN,
-AWS Console, database, Windows, and network-level HTTP. Each source encodes "login" differently
-(POST requests, ASA message codes, `ConsoleLogin` events, `CONNECT` + result codes, EventID
-4624/4625), so each required learning its own semantics before it could be hunted.
+**Type:** Hypothesis-driven · **Result:** No supporting pattern observed; visibility limited
 
-No brute-force found. The value came from what the elimination exposed: **failed authentication
-is not logged at all on the ASA**, and CloudTrail's nested JSON isn't field-extracted (AWS TA
-missing), two blind spots that would hide a real attack. Also flagged: no MFA on IAM console
-logins.
+Examined six authentication surfaces: web application, VPN, AWS Console, database, Windows,
+and network-level HTTP. Each source encodes authentication differently, so the investigation
+starts by identifying its fields and success/failure semantics.
 
----
+The searches did not establish a brute-force pattern. No ASA failed-authentication records
+were found, which leaves VPN failure visibility unverified. CloudTrail also exposed a field
+extraction problem. These limitations prevent treating the negative result as proof that no
+attack occurred. The four examined IAM console logins recorded no MFA use.
 
 ### [Hunt #02 Public S3 Bucket Exposure](hunts/hunt-02-s3-public-bucket-exposure.md)
-**Type:** Pivot-led · **Result:** Confirmed finding · **Severity:** integrity risk
 
-Started from a single command in `bash_history,` an archive was being pushed to S3. Pivoting on the
-*filename* (rather than an IP) across 19 sourcetypes led to the S3 access logs, where **7 of 17
-downloads had no authenticated identity**.
+**Type:** Pivot-led · **Result:** Public ACL grants observed; access impact needs validation
 
-CloudTrail supplied the cause: an IAM user granted `AllUsers` the public internet both **READ
-and WRITE** on the bucket, from an MFA-unauthenticated session, and revoked it 56 minutes later.
-Inside that window, someone outside the organization wrote a file into the bucket named
-**`OPEN_BUCKET_PLEASE_FIX.txt`**, proving the write grant was exploitable.
+A command in `bash_history` led to a filename pivot across 19 sourcetypes. S3 access logs
+contained 17 object GET requests, seven with an anonymous requester. Six of those seven came
+from IPs also seen using a Frothly EC2 role; anonymous identity alone does not establish an
+external actor or a successful download.
 
-The severity here is integrity, not confidentiality: write access to a deployment bucket is a
-supply chain risk: the web archive could have been replaced with a malicious version.
+CloudTrail recorded public `READ` and `WRITE` bucket ACL grants and their removal
+**56 minutes 8 seconds** later. Bucket `READ` permits listing; object download permissions
+need separate verification. The report distinguishes the confirmed ACL change from unresolved
+questions about successful access, the `OPEN_BUCKET_PLEASE_FIX.txt` key, and possible changes
+to deployment artifacts. It includes follow-up queries for that validation.
 
----
+### [Hunt #03 DNS Baseline → Suspected C2](hunts/hunt-03-dns-baseline-c2-discovery.md)
 
-### [Hunt #03 DNS Baseline → C2 Discovery](hunts/hunt-03-dns-baseline-c2-discovery.md)
-**Type:** Baseline · **Result:** Malicious activity confirmed · **Severity:** High
+**Type:** Baseline · **Result:** Suspected C2 requiring investigation · **Priority:** High
 
-No target, no IOCs, just 218,456 DNS events and the question: "What is normal here?"* After
-profiling host volumes and domain distribution, three anomaly techniques were applied: domain
-length, subdomain cardinality, and **entropy**. The first two came back clean. Entropy surfaced a
-single domain seen **3 times out of 176,831 queries**:
+Started with 218,456 DNS events and the question: "What is normal here?" Combining label
+length, low subdomain cardinality, and low query count reduced 5,063 domains to 15 candidates.
+One candidate, `microsoftexchangeservervwu2g8sj20.igg.biz`, appeared in three queries.
 
-```
-microsoftexchangeservervwu2g8sj20.igg.biz
-```
+DNS, HTTP, and endpoint pivots linked suspicious browser traffic to `PCERF-L`. HTTP records
+showed unusually large outbound byte counts and OAuth-like paths. Those observations support
+a C2 investigation; they do not establish the content or amount of stolen data. The referrer
+timeline suggests a possible drive-by chain, with the exact compromise mechanism unconfirmed.
 
-A Microsoft-impersonating name on free dynamic DNS. Following it through HTTP revealed an active
-**C2 channel disguised as OAuth token exchange**, with ~53 KB exfiltrated, including 24 KB
-outbound on a single GET request. Referrer analysis reconstructed the full chain back to the
-moment of compromise: a **drive-by** from a legitimate e-commerce site reached via Bing search.
+The investigation also separated Splunk collector activity from a misleading endpoint alert
+and documented limited Sysmon process attribution for the connections of interest.
 
-Symantec saw the C2 sessions and logged them as **Allowed**. Sysmon couldn't attribute the
-process because network logging (EventID 3) was effectively disabled.
+## Candidate detections
 
----
+These are investigation queries and detection proposals. Production scheduling, independent
+validation, and measured false-positive rates are not yet documented. Newly revised queries
+are marked as pending validation in the reports.
 
-## Detections developed
-
-Hunts produce detections, not just reports. Rules built and threshold-tested against real data:
-
-| Rule | Source | Signal |
+| Candidate | Source | Signal and qualification |
 |---|---|---|
-| Auth-surface enumeration | Hunt #01 | High distinct-parameter count on login pages from one actor, non-browser UA. Tuned across four iterations (v1→v4) with TP/FP analysis at each step. |
-| Public bucket grant | Hunt #02 | `PutBucketAcl` / `PutBucketPolicy` containing `AllUsers` near-zero false positives |
-| Anonymous S3 object access | Hunt #02 | Empty requester field on corporate buckets |
-| Brand impersonation on disposable DNS | Hunt #03 | Known brand string + free dynamic-DNS TLD |
-| Outbound-heavy GET | Hunt #03 | `bytes_out / bytes_in > 3` a GET should download, not upload |
-| Path probing | Hunt #03 | ≥5 distinct paths on one site within a minute = automation |
+| Repeated authentication failures | Hunt #01 | Deferred until failure logging and field extraction are verified |
+| Public bucket ACL grant | Hunt #02 | Successful `PutBucketAcl` with an `AllUsers` grant; policy changes require a separate review |
+| Successful anonymous object access | Hunt #02 | Anonymous requester plus object operation and successful HTTP response |
+| Brand-like label under a reviewed DNS suffix | Hunt #03 | Review lead; domain shape alone does not establish maliciousness |
+| Outbound-heavy GET | Hunt #03 | Byte-volume and direction anomaly; inspect headers, payload, and normal application behavior |
+| Distinct paths within a minute | Hunt #03 | Exploratory lead; ordinary page assets can also meet the threshold |
 
----
+## Reading and reproducing the work
+
+The reports preserve the original query outputs and screenshots. Most discovery searches used
+the Splunk **All time** picker against historical BOTS v3 data. Exact per-source coverage and
+the Splunk/add-on versions were not captured in the original notes; these remain reproduction
+gaps. Each report states its time and evidence limitations, and a [validation checklist](validation-notes.md)
+records what a rerun needs to capture. No new Splunk results are claimed for revised queries.
 
 ## Reference notes
 
-- **[spl-notes.md](spl-notes.md)** - personal SPL reference: each query with what it does and *when it should come to mind*
-- **[stats-family-explained.md](stats-family-explained.md)** - `stats` vs `eventstats` vs `streamstats`: fixed vs flowing baselines
-- **[peak-framework-notes.md](peak-framework-notes.md)** - PEAK's three hunt types, the ABLE scoping model, and how to fill it in
-- **[endpoint-lab-notes.md](endpoint-lab-notes.md)** - Created endpoint lab for new hunts.
+- **[spl-notes.md](spl-notes.md)** — personal SPL reference: what each query does and when to use it.
+- **[stats-family-explained.md](stats-family-explained.md)** — grouping, fixed baselines, and running baselines.
+- **[peak-framework-notes.md](peak-framework-notes.md)** — hunt types, ABLE scoping, and methodology notes.
+- **[endpoint-lab-notes.md](endpoint-lab-notes.md)** — endpoint pipeline setup and preliminary validation notes for future hunts; a separate Hunt #04 report has not yet been written.

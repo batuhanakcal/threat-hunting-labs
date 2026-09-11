@@ -150,7 +150,7 @@ index=botsv3 sourcetype=bash_history
 
 - **stats** → CHANGES row count. Groups, reduces, summarizes. 3907 events → 22 rows. Powerful but destructive (events gone).
 - **eventstats** → KEEPS row count. Same calc, but ATTACHES result onto every row as a new field. 22 rows in → 22 rows out, each tagged.
-- **streamstats** → KEEPS row count, attaches looking only at PRECEDING rows (running totals, moving averages, time-evolving baselines). Depth: next session.
+- **streamstats** → KEEPS row count and attaches running calculations. The current row is included by default; use `current=f` to compare against preceding rows only.
 
 **One-line compass:** need fewer rows → stats. Need a column added → eventstats.
 
@@ -241,18 +241,21 @@ index=botsv3 sourcetype=access_combined
 index=botsv3 sourcetype=access_combined
 | bin _time span=1h
 | stats count as hits by _time
-| sort _time
-| streamstats window=5 avg(hits) as moving_avg
+| sort 0 _time
+| streamstats current=f window=5 count(hits) as baseline_rows avg(hits) as moving_avg
+| where baseline_rows=5 AND moving_avg>0
 | eval spike = hits / moving_avg
 | where spike > 3
 ```
-**What:** streamstats keeps rows but calculates using ONLY preceding rows (running total, moving average), unlike eventstats, which sees the whole table. `window=5` = look back at last 5 rows only (moving average). `spike = hits/moving_avg` = how many times above recent normal.
+**What:** `current=f window=5` compares this row with the preceding five rows. By default, `streamstats` includes the current row. `baseline_rows=5` requires a full baseline; `moving_avg>0` avoids an undefined ratio. Here the rows are observed hourly buckets: missing hours mean these are not necessarily five consecutive hours. Use a bounded, continuous `timechart` if that is the intended baseline.
 **When:** Time-series anomalies sudden spikes a fixed baseline would miss. "Did this suddenly jump vs the last N periods?"
-**Critical:** streamstats is order-sensitive → always `sort _time` first.
+**Critical:** streamstats is order-sensitive. Use `sort 0 _time` here to retain all rows in chronological order, rather than the default sort result limit.
 
 ### stats family — full compass
 - stats → changes row count (reduce/summarize)
 - eventstats → keeps rows, adds column from ALL rows (fixed baseline)
-- streamstats → keeps rows, adds column from PRECEDING rows (flowing baseline, moving averages)
+- streamstats → keeps rows, adds a running calculation; `current=f` excludes the current row.
 
-**Cross-validation win:** streamstats flagged the 09:00 traffic spike (3.3x) independently the same hour the __main__/0.2 hunt found the forum crawler. Two methods, one time window = higher confidence.
+**Historical observation:** the earlier, current-row-inclusive query was recorded as flagging a 09:00 spike at 3.3× in the exploratory web-log work. That value does not validate this revised query. Rerun it and record the changed baseline, result count, and benign examples before reporting effectiveness.
+
+Reference: [Splunk streamstats documentation](https://help.splunk.com/en/splunk-enterprise/search/spl-search-reference/9.0/search-commands/streamstats).
