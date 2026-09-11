@@ -42,7 +42,7 @@ need separate verification. The report distinguishes the confirmed ACL change fr
 questions about successful access, the `OPEN_BUCKET_PLEASE_FIX.txt` key, and possible changes
 to deployment artifacts. It includes follow-up queries for that validation.
 
-### [Hunt #03 DNS Baseline → Suspected C2](hunts/hunt-03-dns-baseline-c2-discovery.md)
+### [Hunt #03 DNS Baseline Suspected C2](hunts/hunt-03-dns-baseline-c2-discovery.md)
 
 **Type:** Baseline · **Result:** Suspected C2 requiring investigation · **Priority:** High
 
