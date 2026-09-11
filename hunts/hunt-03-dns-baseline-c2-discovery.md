@@ -395,7 +395,7 @@ index=botsv3 sourcetype=stream:http
 Five or more distinct paths on one site inside one minute is automation, not browsing. Threshold
 requires tuning against the local environment (see Hunt #01's v1→v4 methodology).
 
-## Lessons learned
+## Important Notes
 
 - **Baseline hunting finds what you weren't looking for.** No IOC list, no intel feed, no alert
   just a statistical profile of normal and a search for what didn't fit. 218,456 events reduced to
