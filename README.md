@@ -64,7 +64,7 @@ These are investigation queries and detection proposals. Production scheduling, 
 validation, and measured false-positive rates are not yet documented. Newly revised queries
 are marked as pending validation in the reports.
 
-| Engineer | Source | Signal and qualification |
+| Detection | Source | Signal and qualification |
 |---|---|---|
 | Repeated authentication failures | Hunt #01 | Deferred until failure logging and field extraction are verified |
 | Public bucket ACL grant | Hunt #02 | Successful `PutBucketAcl` with an `AllUsers` grant; policy changes require a separate review |
